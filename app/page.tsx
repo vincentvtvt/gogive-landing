@@ -1,6 +1,29 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
+
+// Gradient fallbacks for broken images
+const gradients: Record<string, string> = {
+  blue: 'linear-gradient(135deg, #DBEAFE 0%, #93B4FD 100%)',
+  green: 'linear-gradient(135deg, #D1FAE5 0%, #6EE7A0 100%)',
+  warm: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+  gray: 'linear-gradient(135deg, #F3F4F6 0%, #D1D5DB 100%)',
+};
+
+function ImgFallback({ src, alt, className, fallback = 'gray' }: {
+  src: string; alt: string; className?: string; fallback?: keyof typeof gradients;
+}) {
+  const handleError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    img.style.background = gradients[fallback];
+    img.style.objectFit = 'contain';
+    img.src = 'data:image/svg+xml,' + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect fill="none" width="400" height="300"/></svg>`
+    );
+  }, [fallback]);
+
+  return <img className={className} src={src} alt={alt} onError={handleError} />;
+}
 
 export default function Home() {
   useEffect(() => {
@@ -46,10 +69,8 @@ export default function Home() {
           </div>
 
           <div className="hero-visual rv">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="hero-img main" src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&h=750&fit=crop&crop=faces" alt="Young woman smiling" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="hero-img side" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=faces" alt="Man smiling" />
+            <ImgFallback className="hero-img main" src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&h=750&fit=crop&crop=faces" alt="Young woman smiling" fallback="warm" />
+            <ImgFallback className="hero-img side" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=faces" alt="Man smiling" fallback="blue" />
             <div className="hero-badge b1">
               <div className="badge-dot" style={{ background: 'var(--go)' }}>🤖</div>
               <div>
@@ -84,8 +105,7 @@ export default function Home() {
 
         <div className="dual-grid">
           <div className="dual-card go-card rv">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="dual-img" src="https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=400&fit=crop" alt="AI technology" />
+            <ImgFallback className="dual-img" src="https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=400&fit=crop" alt="AI technology" fallback="blue" />
             <div className="dual-tag">⚡ Go — powered by AI</div>
             <h3>The machine that<br />never sleeps</h3>
             <p>Your personal AI agent handles the entire sales conversation — pitching, answering questions, following up, and closing.</p>
@@ -97,8 +117,7 @@ export default function Home() {
           </div>
 
           <div className="dual-card give-card rv">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="dual-img" src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&h=400&fit=crop&crop=faces" alt="Friends together" />
+            <ImgFallback className="dual-img" src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&h=400&fit=crop&crop=faces" alt="Friends together" fallback="green" />
             <div className="dual-tag">💚 Give — powered by you</div>
             <h3>The human who<br />connects</h3>
             <p>You know who needs what. A friend looking for wifi? A neighbor wanting a water purifier? Just share their name — that&apos;s your superpower.</p>
@@ -117,8 +136,7 @@ export default function Home() {
           <div className="how-header rv"><h2>As simple as texting a friend.</h2></div>
           <div className="how-steps">
             <div className="step-card rv">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="step-img" src="https://images.unsplash.com/photo-1556745757-8d76bdb6984b?w=600&h=400&fit=crop" alt="Person typing on phone" />
+              <ImgFallback className="step-img" src="https://images.unsplash.com/photo-1556745757-8d76bdb6984b?w=600&h=400&fit=crop" alt="Person sharing contact on phone" fallback="blue" />
               <div className="step-body">
                 <div className="step-num">1</div>
                 <h3>Share a contact</h3>
@@ -127,8 +145,7 @@ export default function Home() {
               </div>
             </div>
             <div className="step-card rv">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="step-img" src="https://images.unsplash.com/photo-1531746790095-e5cb5a3c3c82?w=600&h=400&fit=crop" alt="Chat conversation" />
+              <ImgFallback className="step-img" src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&h=400&fit=crop" alt="AI chatbot handling conversation" fallback="blue" />
               <div className="step-body">
                 <div className="step-num">2</div>
                 <h3>AI handles the rest</h3>
@@ -137,8 +154,7 @@ export default function Home() {
               </div>
             </div>
             <div className="step-card rv">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="step-img" src="https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=600&h=400&fit=crop" alt="Earnings" />
+              <ImgFallback className="step-img" src="https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=600&h=400&fit=crop" alt="Money earned from referral" fallback="green" />
               <div className="step-body">
                 <div className="step-num">3</div>
                 <h3>You both earn</h3>
@@ -158,14 +174,13 @@ export default function Home() {
         </div>
         <div className="prod-grid rv">
           {[
-            { img: 'photo-1564419320461-6870880221ad', name: 'LG PuriCare', type: 'Water purifier', mult: '6×', earn: 'RM 60' },
-            { img: 'photo-1544197150-b99a580bb7a8', name: 'Unifi Business', type: 'B2B fibre internet', mult: '4×', earn: 'RM 40' },
-            { img: 'photo-1558618666-fcd25c85f82e', name: 'Unifi Home', type: 'Home fibre internet', mult: '2×', earn: 'RM 20' },
-            { img: 'photo-1511707171634-5f897ff02aa9', name: 'Unifi Mobile', type: 'Postpaid plan', mult: '1×', earn: 'RM 10' },
+            { img: 'https://images.unsplash.com/photo-1564419320461-6870880221ad?w=500&h=300&fit=crop', name: 'LG PuriCare', type: 'Water purifier', mult: '6×', earn: 'RM 60' },
+            { img: 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=500&h=300&fit=crop', name: 'Unifi Business', type: 'B2B fibre internet', mult: '4×', earn: 'RM 40' },
+            { img: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=500&h=300&fit=crop', name: 'Unifi Home', type: 'Home fibre internet', mult: '2×', earn: 'RM 20' },
+            { img: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&h=300&fit=crop', name: 'Unifi Mobile', type: 'Postpaid plan', mult: '1×', earn: 'RM 10' },
           ].map(p => (
             <div className="prod-item" key={p.name}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="prod-img" src={`https://images.unsplash.com/${p.img}?w=500&h=300&fit=crop`} alt={p.name} />
+              <ImgFallback className="prod-img" src={p.img} alt={p.name} fallback="blue" />
               <div className="prod-info">
                 <div className="prod-name">{p.name}</div>
                 <div className="prod-type">{p.type}</div>
@@ -184,14 +199,13 @@ export default function Home() {
         <div className="proof-inner">
           <div className="proof-grid">
             {[
-              { img: 'photo-1494790108377-be9c29b29330', name: 'Aisyah M.', role: 'Freelance designer, KL', text: '"I just tell my friends about Unifi when they complain about slow internet. AI handles everything else. Made RM 480 last month doing basically nothing."', earn: 'RM 480 earned last month' },
-              { img: 'photo-1507003211169-0a1dd7228f2d', name: 'Ravi K.', role: 'Sales executive, Penang', text: '"I\'m already talking to people all day. Now when someone mentions they need wifi or a purifier, I just drop their number into GoGive."', earn: 'RM 1,200 earned this quarter' },
-              { img: 'photo-1438761681033-6461ffad8d80', name: 'Sarah T.', role: 'Student, Johor', text: '"My parents\' friends all needed help setting up Unifi. I referred 8 of them and the AI closed 6. More than my part-time job pays."', earn: 'RM 120 earned in first week' },
+              { img: 'https://i.pravatar.cc/100?img=25', name: 'Aisyah N.', role: 'Freelance designer, KL', text: '"I just tell my friends about Unifi when they complain about slow internet. AI handles everything else. Made RM 480 last month doing basically nothing."', earn: 'RM 480 earned last month' },
+              { img: 'https://i.pravatar.cc/100?img=59', name: 'Wei Liang C.', role: 'Property agent, Penang', text: '"I\'m already talking to people all day. Now when someone mentions they need wifi or a purifier, I just drop their number into GoGive. The AI does the rest."', earn: 'RM 1,200 earned this quarter' },
+              { img: 'https://i.pravatar.cc/100?img=32', name: 'Priya S.', role: 'Student, Johor', text: '"My parents\' friends all needed help setting up Unifi. I referred 8 of them and the AI closed 6. More than my part-time job pays in a week."', earn: 'RM 120 earned in first week' },
             ].map(t => (
               <div className="proof-card rv" key={t.name}>
                 <div className="proof-top">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="proof-av" src={`https://images.unsplash.com/${t.img}?w=100&h=100&fit=crop&crop=faces`} alt="" />
+                  <ImgFallback className="proof-av" src={t.img} alt={t.name} fallback="warm" />
                   <div><div className="proof-name">{t.name}</div><div className="proof-role">{t.role}</div></div>
                 </div>
                 <div className="proof-text">{t.text}</div>
@@ -215,8 +229,7 @@ export default function Home() {
             <div className="flag-item">🇵🇭 Philippines <span className="soon">2027</span></div>
           </div>
         </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="global-img rv" src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&h=600&fit=crop" alt="Diverse group" />
+        <ImgFallback className="global-img rv" src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&h=600&fit=crop" alt="Diverse group of people" fallback="warm" />
       </section>
 
       {/* CTA */}
@@ -225,7 +238,7 @@ export default function Home() {
           <h2 className="rv">The <span className="go">AI</span> is ready.<br />Are <span className="give">you</span>?</h2>
           <p className="rv">Join GoGive in 30 seconds. No downloads. No fees. Just your phone number and WhatsApp.</p>
           <div className="cta-join rv">
-            <label style={{ fontSize: '13px', fontWeight: 700, textAlign: 'left' }}>Join GoGive — free forever</label>
+            <label style={{ fontSize: '13px', fontWeight: 700, textAlign: 'left' as const }}>Join GoGive — free forever</label>
             <div className="join-row">
               <input type="tel" placeholder="+60 your phone number" />
               <button className="join-btn">Join Free →</button>
