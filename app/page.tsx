@@ -2,22 +2,12 @@
 
 import { useEffect } from 'react';
 
-const TICKER_DATA = [
-  { name: 'A', label: 'Aisyah earned from Unifi Home referral', amount: '+RM 20', time: '2m ago', bg: 'linear-gradient(135deg,#00C853,#69F0AE)' },
-  { name: 'R', label: 'Ravi got buyer reward — LG PuriCare', amount: '+RM 36', time: '5m ago', bg: 'linear-gradient(135deg,#7C5CFC,#B388FF)' },
-  { name: 'S', label: 'Sarah referred Unifi Business', amount: '+RM 40', time: '8m ago', bg: 'linear-gradient(135deg,#FF6B6B,#FF8A80)' },
-  { name: 'D', label: 'Daniel hit Gold tier 🏆', amount: '+RM 1.20/pt', time: '12m ago', bg: 'linear-gradient(135deg,#FFB800,#FFD54F)' },
-  { name: 'L', label: 'Li Mei withdrew to Maybank', amount: 'RM 380', time: '15m ago', bg: 'linear-gradient(135deg,#38BDF8,#7DD3FC)' },
-];
-
-const MARQUEE = ['REFER', 'EARN', 'ZERO EFFORT', 'AI POWERED', 'BOTH EARN', 'WITHDRAW ANYTIME', 'YOUR NETWORK = YOUR INCOME', 'NO SELLING NEEDED'];
-
 export default function Home() {
   useEffect(() => {
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('vis'); });
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('v'); });
     }, { threshold: 0.12 });
-    document.querySelectorAll('.reveal, .reveal-stagger').forEach(el => io.observe(el));
+    document.querySelectorAll('.rv').forEach(el => io.observe(el));
     return () => io.disconnect();
   }, []);
 
@@ -25,189 +15,135 @@ export default function Home() {
     <>
       {/* NAV */}
       <nav>
-        <a className="nav-logo" href="#">
-          <div className="nav-icon">G</div>
-          <div className="nav-name">Go<em>Give</em></div>
+        <a className="logo" href="#">
+          <span className="go">Go</span><span className="give">Give</span>
         </a>
-        <a className="nav-link" href="#how">How It Works</a>
-        <a className="nav-link" href="#earn">Earnings</a>
-        <a className="nav-link" href="#products">Products</a>
-        <a className="nav-cta" href="#join">Get Early Access</a>
+        <div className="nav-r">
+          <a className="nav-a" href="#how">How It Works</a>
+          <a className="nav-a" href="#products">Products</a>
+          <a className="nav-a" href="#earn">Earn</a>
+          <a className="nav-join" href="#join">Join Free</a>
+        </div>
       </nav>
 
       {/* HERO */}
       <section className="hero">
-        <div className="orb orb-1" />
-        <div className="orb orb-2" />
-        <div className="orb orb-3" />
+        <div className="hero-top">
+          <div className="hero-text rv">
+            <h1>AI <span className="go">goes.</span><br />You <span className="give">give.</span><br />Both earn.</h1>
+            <p className="hero-p">You have the connections. AI has the sales skills. Together, you close deals on WhatsApp — and everyone gets paid.</p>
+            <div className="join-box" id="join">
+              <label>Join instantly — it&apos;s free</label>
+              <div className="join-row">
+                <input type="tel" placeholder="+60 12 345 6789" />
+                <button className="join-btn">Join Now</button>
+              </div>
+              <div className="join-note">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                We&apos;ll send you a WhatsApp to get started. No app download needed.
+              </div>
+            </div>
+          </div>
 
-        <div className="hero-pill">
-          <span className="pill-dot">🇲🇾</span>
-          Now live in Malaysia · More countries coming 2026
+          <div className="hero-visual rv">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="hero-img main" src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&h=750&fit=crop&crop=faces" alt="Young woman smiling" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="hero-img side" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=faces" alt="Man smiling" />
+            <div className="hero-badge b1">
+              <div className="badge-dot" style={{ background: 'var(--go)' }}>🤖</div>
+              <div>
+                <div className="badge-sub">AI just closed</div>
+                <div style={{ fontWeight: 700 }}>Unifi Home signup</div>
+              </div>
+            </div>
+            <div className="hero-badge b2">
+              <div className="badge-dot" style={{ background: 'var(--give)' }}>💰</div>
+              <div>
+                <div className="badge-sub">You earned</div>
+                <div style={{ fontWeight: 700, color: 'var(--give)' }}>+RM 20.00</div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <h1>Share a name.<br /><span className="green">AI closes the deal.</span><br />You both earn.</h1>
+        <div className="hero-stats rv">
+          <div className="stat-item"><div className="stat-val blue">2,400+</div><div className="stat-label">Active referrers</div></div>
+          <div className="stat-item"><div className="stat-val green">RM 890K</div><div className="stat-label">Earned by community</div></div>
+          <div className="stat-item"><div className="stat-val">94%</div><div className="stat-label">AI conversation success</div></div>
+          <div className="stat-item"><div className="stat-val">12 sec</div><div className="stat-label">Average time to refer</div></div>
+        </div>
+      </section>
 
-        <p className="hero-sub">Everyone has a network. Now it pays. GoGive gives you a personal AI sales agent — it talks to your contacts, handles the pitch, and closes deals while you go about your day.</p>
-
-        <div className="hero-actions">
-          <a className="btn btn-fill" href="#join">Start Earning Free →</a>
-          <a className="btn btn-ghost" href="#how">See How It Works</a>
+      {/* DUALITY */}
+      <section className="duality">
+        <div className="section-header rv">
+          <h2>Two forces.<br />One platform.</h2>
+          <p>GoGive combines AI automation with human connection — so anyone can earn from their network without being a salesperson.</p>
         </div>
 
-        {/* Ticker */}
-        <div className="ticker-wrap">
-          <div className="ticker-label">Live Earnings Feed</div>
-          <div className="ticker">
-            <div className="ticker-inner">
-              {[...TICKER_DATA, ...TICKER_DATA].map((t, i) => (
-                <div className="tick" key={i}>
-                  <div className="tick-left">
-                    <div className="tick-avatar" style={{ background: t.bg }}>{t.name}</div>
-                    {t.label}
-                  </div>
-                  <div className="tick-right">
-                    <span className="tick-amount">{t.amount}</span>
-                    <span className="tick-time">{t.time}</span>
-                  </div>
-                </div>
-              ))}
+        <div className="dual-grid">
+          <div className="dual-card go-card rv">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="dual-img" src="https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=400&fit=crop" alt="AI technology" />
+            <div className="dual-tag">⚡ Go — powered by AI</div>
+            <h3>The machine that<br />never sleeps</h3>
+            <p>Your personal AI agent handles the entire sales conversation — pitching, answering questions, following up, and closing.</p>
+            <div className="dual-features">
+              <div className="df-item"><div className="df-icon">🗣️</div> Speaks BM, English &amp; Chinese naturally</div>
+              <div className="df-item"><div className="df-icon">🔄</div> Smart follow-ups at the right time</div>
+              <div className="df-item"><div className="df-icon">📱</div> Works 24/7 on WhatsApp</div>
+            </div>
+          </div>
+
+          <div className="dual-card give-card rv">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="dual-img" src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&h=400&fit=crop&crop=faces" alt="Friends together" />
+            <div className="dual-tag">💚 Give — powered by you</div>
+            <h3>The human who<br />connects</h3>
+            <p>You know who needs what. A friend looking for wifi? A neighbor wanting a water purifier? Just share their name — that&apos;s your superpower.</p>
+            <div className="dual-features">
+              <div className="df-item"><div className="df-icon">🤝</div> No selling, no scripts, no pressure</div>
+              <div className="df-item"><div className="df-icon">🎁</div> Both you and your friend earn</div>
+              <div className="df-item"><div className="df-icon">🏦</div> Withdraw anytime to your bank</div>
             </div>
           </div>
         </div>
       </section>
-
-      {/* MARQUEE */}
-      <div className="marquee-section">
-        <div className="marquee-track">
-          {[...MARQUEE, ...MARQUEE].map((t, i) => (
-            <span key={i} className={i % 2 === 1 ? 'hl' : ''}>{t}</span>
-          ))}
-        </div>
-      </div>
 
       {/* HOW IT WORKS */}
-      <section className="section" id="how">
-        <div className="reveal">
-          <div className="section-eyebrow">How It Works</div>
-          <div className="section-h">Three taps. Zero selling.<br />That&apos;s the whole job.</div>
-          <div className="section-p">No product training. No scripts. No awkward sales pitch to your friends. Just connect people to products — AI does everything else.</div>
-        </div>
-
-        <div className="how-grid reveal-stagger">
-          <div className="how-card">
-            <div className="how-num">01</div>
-            <div className="how-title">Drop a name & number</div>
-            <div className="how-desc">Know someone who might want faster wifi? A water purifier? Just share their name and phone. Takes 12 seconds.</div>
-            <div className="how-tag">💬 12 seconds avg</div>
-          </div>
-          <div className="how-card">
-            <div className="how-num">02</div>
-            <div className="how-title">AI handles everything</div>
-            <div className="how-desc">Your personal AI agent reaches out on WhatsApp, chats naturally in BM/English/Chinese, answers questions, and closes the deal.</div>
-            <div className="how-tag">🤖 Fully automated</div>
-          </div>
-          <div className="how-card">
-            <div className="how-num">03</div>
-            <div className="how-title">You both get paid</div>
-            <div className="how-desc">When the deal completes — you earn commission, they earn buyer rewards. Withdraw to your bank anytime. No minimum lock-in.</div>
-            <div className="how-tag">💰 Both earn</div>
-          </div>
-        </div>
-      </section>
-
-      {/* AI AGENT + PHONE */}
-      <section className="ai-section">
-        <div className="orb" style={{ width: 500, height: 500, top: -200, right: -100 }} />
-        <div className="ai-inner">
-          <div className="ai-content reveal">
-            <div className="section-eyebrow">Your AI Employee</div>
-            <div className="section-h">It sells so you don&apos;t have to.</div>
-            <div className="section-p">Your AI agent works 24/7. It speaks your customer&apos;s language, handles objections, and never forgets to follow up.</div>
-
-            <div className="ai-features">
-              {[
-                { icon: '🗣️', title: 'Speaks BM, English & Chinese', desc: 'Detects language automatically. Code-switches naturally like a real Malaysian.' },
-                { icon: '🔄', title: 'Smart follow-ups', desc: 'No reply? AI follows up at the right time, right tone. No spamming.' },
-                { icon: '📊', title: 'Track everything live', desc: 'Watch your AI work in real time. See conversations, status, and earnings update instantly.' },
-              ].map((f, i) => (
-                <div className="ai-feat" key={i}>
-                  <div className="ai-feat-icon">{f.icon}</div>
-                  <div>
-                    <div className="ai-feat-title">{f.title}</div>
-                    <div className="ai-feat-desc">{f.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="phone-wrap reveal">
-            <div className="phone">
-              <div className="phone-notch" />
-              <div className="phone-screen">
-                <div className="wa-header">
-                  <span className="wa-back">‹</span>
-                  <div className="wa-av">G</div>
-                  <div>
-                    <div className="wa-name">GoGive AI</div>
-                    <div className="wa-status">● online</div>
-                  </div>
-                </div>
-                <div className="wa-body">
-                  <div className="bubble ai">Hi Ahmad! 👋 Your friend Vincent mentioned you might be looking for home internet. Are you currently on Streamyx? <span className="time">10:42 AM</span></div>
-                  <div className="bubble user">Ya la, very slow already. How much Unifi? <span className="time">10:43 AM</span></div>
-                  <div className="bubble ai">Great question! Unifi Home 300Mbps is RM129/month — includes free router + installation. Want me to check coverage at your area? 😊 <span className="time">10:43 AM</span></div>
-                  <div className="bubble user">Ok check 75200 <span className="time">10:44 AM</span></div>
-                  <div className="bubble ai">✅ 75200 confirmed! Full coverage. I can register you now — just need your full name and IC. Takes 2 mins! <span className="time">10:44 AM</span></div>
-                  <div className="bubble-notify">🎉 Deal closed — 4 messages<br /><strong>+RM 20.00</strong></div>
-                </div>
+      <section className="how-section" id="how">
+        <div className="how-inner">
+          <div className="how-header rv"><h2>As simple as texting a friend.</h2></div>
+          <div className="how-steps">
+            <div className="step-card rv">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="step-img" src="https://images.unsplash.com/photo-1556745757-8d76bdb6984b?w=600&h=400&fit=crop" alt="Person typing on phone" />
+              <div className="step-body">
+                <div className="step-num">1</div>
+                <h3>Share a contact</h3>
+                <p>Know someone who needs internet, a purifier, or any GoGive product? Drop their name and number — takes 12 seconds.</p>
+                <div className="step-tag">Your part is done here</div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* BOTH EARN */}
-      <section className="earn-section" id="earn">
-        <div className="earn-inner">
-          <div className="reveal">
-            <div className="section-eyebrow">Two-Way Rewards</div>
-            <div className="section-h">You earn. They earn.<br />Then they start referring too.</div>
-            <div className="section-p">The only referral program where both sides win. And every buyer can become a referrer.</div>
-          </div>
-
-          <div className="earn-split">
-            <div className="earn-card referrer reveal">
-              <div className="earn-label">🔗 You — The Referrer</div>
-              <div className="earn-h">Earn up to <span>RM 60</span> per referral</div>
-              <div className="earn-desc">Just share a name. Your AI does the selling. You get paid when the order completes.</div>
-              <div className="earn-rows">
-                {[['AI contacts customer', '+3 pts'], ['Order confirmed', '+3 pts'], ['30-day completion', '+4 pts']].map(([l, v], i) => (
-                  <div className="earn-row" key={i}><span className="earn-row-label">{l}</span><span className="earn-row-v">{v}</span></div>
-                ))}
-                <div className="earn-total-bar">
-                  <span className="earn-total-label">Max per referral</span>
-                  <span className="earn-total-v">10 pts</span>
-                </div>
+            <div className="step-card rv">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="step-img" src="https://images.unsplash.com/photo-1531746790095-e5cb5a3c3c82?w=600&h=400&fit=crop" alt="Chat conversation" />
+              <div className="step-body">
+                <div className="step-num">2</div>
+                <h3>AI handles the rest</h3>
+                <p>Your AI agent reaches out on WhatsApp, chats naturally, answers questions, and guides them to purchase. All automated.</p>
+                <div className="step-tag">100% automated by AI</div>
               </div>
             </div>
-
-            <div className="earn-card buyer reveal">
-              <div className="earn-label">🎁 Friend — The Buyer</div>
-              <div className="earn-h">They earn up to <span>RM 36</span> in rewards</div>
-              <div className="earn-desc">Your friend isn&apos;t just a customer — they earn rewards too. And once verified, they can start referring.</div>
-              <div className="earn-rows">
-                {[['Purchase completed', '+4 pts'], ['30-day loyalty bonus', '+2 pts']].map(([l, v], i) => (
-                  <div className="earn-row" key={i}><span className="earn-row-label">{l}</span><span className="earn-row-v">{v}</span></div>
-                ))}
-                <div className="earn-total-bar">
-                  <span className="earn-total-label">Max per purchase</span>
-                  <span className="earn-total-v">6 pts</span>
-                </div>
-              </div>
-              <div className="earn-note">
-                ✨ <strong style={{ color: 'var(--violet)' }}>Viral loop:</strong> Every buyer can become a referrer. They verify, start sharing, and earn the full 10 pts per referral. Single-level only — not MLM.
+            <div className="step-card rv">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="step-img" src="https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=600&h=400&fit=crop" alt="Earnings" />
+              <div className="step-body">
+                <div className="step-num">3</div>
+                <h3>You both earn</h3>
+                <p>Deal completes → you get commission points, they get buyer rewards. Real money, straight to your bank account.</p>
+                <div className="step-tag">Both sides win</div>
               </div>
             </div>
           </div>
@@ -216,88 +152,102 @@ export default function Home() {
 
       {/* PRODUCTS */}
       <section className="products-section" id="products">
-        <div className="products-inner">
-          <div className="reveal">
-            <div className="section-eyebrow">Products</div>
-            <div className="section-h">Higher-value products.<br />Bigger rewards.</div>
-            <div className="section-p">Each product has a multiplier. Points × Multiplier = your payout.</div>
-          </div>
-
-          <div className="products-grid reveal-stagger">
-            {[
-              { emoji: '🫧', name: 'LG PuriCare', type: 'Water purifier', mult: '6×', earn: 'RM 60' },
-              { emoji: '📡', name: 'Unifi Business', type: 'B2B fibre internet', mult: '4×', earn: 'RM 40' },
-              { emoji: '🏠', name: 'Unifi Home', type: 'Home fibre internet', mult: '2×', earn: 'RM 20' },
-              { emoji: '📱', name: 'Unifi Mobile', type: 'Postpaid plan', mult: '1×', earn: 'RM 10' },
-            ].map((p, i) => (
-              <div className="prod-card" key={i}>
-                <span className="prod-emoji">{p.emoji}</span>
+        <div className="products-header rv">
+          <h2>Earn on products<br />people actually want.</h2>
+          <p>Higher-value products earn higher multipliers. New products added every month.</p>
+        </div>
+        <div className="prod-grid rv">
+          {[
+            { img: 'photo-1564419320461-6870880221ad', name: 'LG PuriCare', type: 'Water purifier', mult: '6×', earn: 'RM 60' },
+            { img: 'photo-1544197150-b99a580bb7a8', name: 'Unifi Business', type: 'B2B fibre internet', mult: '4×', earn: 'RM 40' },
+            { img: 'photo-1558618666-fcd25c85f82e', name: 'Unifi Home', type: 'Home fibre internet', mult: '2×', earn: 'RM 20' },
+            { img: 'photo-1511707171634-5f897ff02aa9', name: 'Unifi Mobile', type: 'Postpaid plan', mult: '1×', earn: 'RM 10' },
+          ].map(p => (
+            <div className="prod-item" key={p.name}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="prod-img" src={`https://images.unsplash.com/${p.img}?w=500&h=300&fit=crop`} alt={p.name} />
+              <div className="prod-info">
                 <div className="prod-name">{p.name}</div>
                 <div className="prod-type">{p.type}</div>
-                <div className="prod-mult">{p.mult} multiplier</div>
-                <div className="prod-earn">Earn up to <strong>{p.earn}</strong> per referral</div>
+                <div className="prod-row">
+                  <div className="prod-mult">{p.mult} multiplier</div>
+                  <div className="prod-earn">Up to {p.earn}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* SOCIAL PROOF */}
+      <section className="proof-section">
+        <div className="proof-inner">
+          <div className="proof-grid">
+            {[
+              { img: 'photo-1494790108377-be9c29b29330', name: 'Aisyah M.', role: 'Freelance designer, KL', text: '"I just tell my friends about Unifi when they complain about slow internet. AI handles everything else. Made RM 480 last month doing basically nothing."', earn: 'RM 480 earned last month' },
+              { img: 'photo-1507003211169-0a1dd7228f2d', name: 'Ravi K.', role: 'Sales executive, Penang', text: '"I\'m already talking to people all day. Now when someone mentions they need wifi or a purifier, I just drop their number into GoGive."', earn: 'RM 1,200 earned this quarter' },
+              { img: 'photo-1438761681033-6461ffad8d80', name: 'Sarah T.', role: 'Student, Johor', text: '"My parents\' friends all needed help setting up Unifi. I referred 8 of them and the AI closed 6. More than my part-time job pays."', earn: 'RM 120 earned in first week' },
+            ].map(t => (
+              <div className="proof-card rv" key={t.name}>
+                <div className="proof-top">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="proof-av" src={`https://images.unsplash.com/${t.img}?w=100&h=100&fit=crop&crop=faces`} alt="" />
+                  <div><div className="proof-name">{t.name}</div><div className="proof-role">{t.role}</div></div>
+                </div>
+                <div className="proof-text">{t.text}</div>
+                <div className="proof-earn">💰 {t.earn}</div>
               </div>
             ))}
-            <div className="prod-card coming">
-              <span className="prod-emoji">✨</span>
-              <div className="prod-name">More coming</div>
-              <div className="prod-type">New products added monthly</div>
-            </div>
           </div>
         </div>
       </section>
 
       {/* GLOBAL */}
-      <section className="global-section reveal">
-        <div className="section-eyebrow" style={{ textAlign: 'center' }}>Global Vision</div>
-        <div className="section-h" style={{ margin: '0 auto', textAlign: 'center' }}>One app. Every country.<br />Infinite products.</div>
-        <p className="vision-text">Starting in Malaysia. Different countries bring different products, different languages, different opportunities — all on GoGive.</p>
-
-        <div className="flags">
-          <div className="flag-chip live">🇲🇾 Malaysia — Live Now</div>
-          {[
-            ['🇸🇬', 'Singapore', "Q3 '26"], ['🇮🇩', 'Indonesia', "Q4 '26"],
-            ['🇹🇭', 'Thailand', '2027'], ['🇵🇭', 'Philippines', '2027'], ['🇻🇳', 'Vietnam', '2027'],
-          ].map(([flag, name, when], i) => (
-            <div className="flag-chip soon" key={i}>{flag} {name} <span className="soon-dot">{when}</span></div>
-          ))}
+      <section className="global-section" id="earn">
+        <div className="global-text rv">
+          <h2>Starting here.<br />Going everywhere.</h2>
+          <p>Different countries bring different products, different languages, different opportunities. Your network has no borders — and neither does GoGive.</p>
+          <div className="flag-list">
+            <div className="flag-item live">🇲🇾 Malaysia — Live</div>
+            <div className="flag-item">🇸🇬 Singapore <span className="soon">Q3 &apos;26</span></div>
+            <div className="flag-item">🇮🇩 Indonesia <span className="soon">Q4 &apos;26</span></div>
+            <div className="flag-item">🇹🇭 Thailand <span className="soon">2027</span></div>
+            <div className="flag-item">🇵🇭 Philippines <span className="soon">2027</span></div>
+          </div>
         </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="global-img rv" src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&h=600&fit=crop" alt="Diverse group" />
       </section>
 
       {/* CTA */}
-      <section className="cta-section" id="join">
-        <div className="cta-h reveal">Your network is worth more than you think. <span className="green">Start earning from it.</span></div>
-        <p className="cta-p reveal">Join the GoGive community. Be first when we launch in your area.</p>
-
-        <div className="cta-form reveal">
-          <input type="tel" placeholder="+60 your phone number" />
-          <button className="btn btn-fill">Join Waitlist →</button>
-        </div>
-        <p className="cta-note reveal">Free forever · No selling required · Withdraw anytime</p>
-
-        <div className="app-badges reveal">
-          <a className="app-badge" href="#">
-            <span style={{ fontSize: 22 }}>🍎</span>
-            <div>
-              <span className="app-badge-label">Coming soon on</span>
-              <span className="app-badge-name">App Store</span>
+      <section className="cta-section">
+        <div className="cta-content">
+          <h2 className="rv">The <span className="go">AI</span> is ready.<br />Are <span className="give">you</span>?</h2>
+          <p className="rv">Join GoGive in 30 seconds. No downloads. No fees. Just your phone number and WhatsApp.</p>
+          <div className="cta-join rv">
+            <label style={{ fontSize: '13px', fontWeight: 700, textAlign: 'left' }}>Join GoGive — free forever</label>
+            <div className="join-row">
+              <input type="tel" placeholder="+60 your phone number" />
+              <button className="join-btn">Join Free →</button>
             </div>
-          </a>
-          <a className="app-badge" href="#">
-            <span style={{ fontSize: 22 }}>▶️</span>
-            <div>
-              <span className="app-badge-label">Coming soon on</span>
-              <span className="app-badge-name">Google Play</span>
-            </div>
-          </a>
+          </div>
+          <div className="cta-trust rv">
+            <span>✅ Free forever</span>
+            <span>🔒 No selling required</span>
+            <span>🏦 Withdraw anytime</span>
+          </div>
+          <div className="app-row rv">
+            <a className="app-badge" href="#"><span style={{ fontSize: '20px' }}>🍎</span><div><small>Coming soon</small><strong>App Store</strong></div></a>
+            <a className="app-badge" href="#"><span style={{ fontSize: '20px' }}>▶️</span><div><small>Coming soon</small><strong>Google Play</strong></div></a>
+          </div>
         </div>
       </section>
 
       {/* FOOTER */}
       <footer>
-        <div className="foot-left">
-          <div className="nav-icon" style={{ width: 24, height: 24, fontSize: 13, borderRadius: 6 }}>G</div>
-          © 2026 GoGive.ai
+        <div className="foot-l">
+          <span style={{ fontWeight: 800, fontSize: '16px' }}><span style={{ color: 'var(--go)' }}>Go</span><span style={{ color: 'var(--give)' }}>Give</span></span>
+          &nbsp;© 2026
         </div>
         <div className="foot-links">
           <a href="#">Privacy</a>
