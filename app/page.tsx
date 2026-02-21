@@ -138,7 +138,7 @@ export default function Home() {
             <div className="step-card rv">
               <ImgFallback className="step-img" src="https://images.unsplash.com/photo-1556745757-8d76bdb6984b?w=600&h=400&fit=crop" alt="Person sharing contact on phone" fallback="blue" />
               <div className="step-body">
-                <div className="step-num">1</div>
+                <div className="step-num">01</div>
                 <h3>Share a contact</h3>
                 <p>Know someone who needs internet, a purifier, or any GoGive product? Drop their name and number — takes 12 seconds.</p>
                 <div className="step-tag">Your part is done here</div>
@@ -147,7 +147,7 @@ export default function Home() {
             <div className="step-card rv">
               <ImgFallback className="step-img" src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&h=400&fit=crop" alt="AI chatbot handling conversation" fallback="blue" />
               <div className="step-body">
-                <div className="step-num">2</div>
+                <div className="step-num">02</div>
                 <h3>AI handles the rest</h3>
                 <p>Your AI agent reaches out on WhatsApp, chats naturally, answers questions, and guides them to purchase. All automated.</p>
                 <div className="step-tag">100% automated by AI</div>
@@ -156,7 +156,7 @@ export default function Home() {
             <div className="step-card rv">
               <ImgFallback className="step-img" src="https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=600&h=400&fit=crop" alt="Money earned from referral" fallback="green" />
               <div className="step-body">
-                <div className="step-num">3</div>
+                <div className="step-num">03</div>
                 <h3>You both earn</h3>
                 <p>Deal completes → you get commission points, they get buyer rewards. Real money, straight to your bank account.</p>
                 <div className="step-tag">Both sides win</div>
@@ -174,13 +174,16 @@ export default function Home() {
         </div>
         <div className="prod-grid rv">
           {[
-            { img: 'https://images.unsplash.com/photo-1564419320461-6870880221ad?w=500&h=300&fit=crop', name: 'LG PuriCare', type: 'Water purifier', mult: '6×', earn: 'RM 60' },
-            { img: 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=500&h=300&fit=crop', name: 'Unifi Business', type: 'B2B fibre internet', mult: '4×', earn: 'RM 40' },
-            { img: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=500&h=300&fit=crop', name: 'Unifi Home', type: 'Home fibre internet', mult: '2×', earn: 'RM 20' },
-            { img: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&h=300&fit=crop', name: 'Unifi Mobile', type: 'Postpaid plan', mult: '1×', earn: 'RM 10' },
+            { name: 'LG PuriCare', type: 'Water purifier', mult: '6×', earn: 'RM 60', bg: '#A50034', label: 'LG', sub: 'PuriCare' },
+            { name: 'Unifi Business', type: 'B2B fibre internet', mult: '4×', earn: 'RM 40', bg: '#E4002B', label: 'unifi', sub: 'Business' },
+            { name: 'Unifi Home', type: 'Home fibre internet', mult: '2×', earn: 'RM 20', bg: '#0033A0', label: 'unifi', sub: 'Home' },
+            { name: 'Unifi Mobile', type: 'Postpaid plan', mult: '1×', earn: 'RM 10', bg: '#6B21A8', label: 'unifi', sub: 'Mobile' },
           ].map(p => (
             <div className="prod-item" key={p.name}>
-              <ImgFallback className="prod-img" src={p.img} alt={p.name} fallback="blue" />
+              <div className="prod-brand" style={{ background: p.bg }}>
+                <span className="prod-brand-label">{p.label}</span>
+                <span className="prod-brand-sub">{p.sub}</span>
+              </div>
               <div className="prod-info">
                 <div className="prod-name">{p.name}</div>
                 <div className="prod-type">{p.type}</div>
