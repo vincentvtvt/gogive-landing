@@ -1,6 +1,7 @@
 // FILE: app/gogiver/dashboard/page.tsx
+// v2 — with Admin tab (role-based: admin + superuser)
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 const API = '/api/gogiver';
@@ -15,27 +16,30 @@ const STATUS_CONF: Record<string, { label: string; emoji: string; color: string 
   in_progress:   { label: 'AI Handling',    emoji: '🤖', color: 'text-blue-400' },
   completed:     { label: 'Completed',      emoji: '✅', color: 'text-emerald-400' },
   cancelled:     { label: 'Cancelled',      emoji: '🚫', color: 'text-red-400' },
-  rejected:      { label: 'Rejected',       emoji: '⚠️', color: 'text-orange-400' },
   dropped:       { label: 'Not Interested', emoji: '👋', color: 'text-gray-500' },
-  no_response:   { label: 'No Response',    emoji: '😶', color: 'text-gray-500' },
   failed:        { label: 'Failed',         emoji: '❌', color: 'text-red-400' },
   inject_failed: { label: 'Contact Failed', emoji: '⚠️', color: 'text-red-400' },
 };
 
-const CATEGORY_STYLE: Record<string, { bg: string; text: string; glow: string }> = {
-  NEW:        { bg: 'bg-blue-500/15',   text: 'text-blue-400',    glow: 'shadow-blue-500/20' },
-  PENDING:    { bg: 'bg-yellow-500/15', text: 'text-yellow-400',  glow: 'shadow-yellow-500/20' },
-  PROCESSING: { bg: 'bg-purple-500/15', text: 'text-purple-400',  glow: 'shadow-purple-500/20' },
-  COMPLETE:   { bg: 'bg-emerald-500/15',text: 'text-emerald-400', glow: 'shadow-emerald-500/20' },
+const CATEGORY_STYLE: Record<string, { bg: string; text: string }> = {
+  NEW:        { bg: 'bg-blue-500/15',    text: 'text-blue-400' },
+  PENDING:    { bg: 'bg-yellow-500/15',  text: 'text-yellow-400' },
+  PROCESSING: { bg: 'bg-purple-500/15',  text: 'text-purple-400' },
+  COMPLETE:   { bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
 };
+
+type Tab = 'home' | 'refer' | 'products' | 'wallet' | 'admin';
+type AdminView = 'stats' | 'givers' | 'feed' | 'rates' | 'withdrawals' | 'giver_detail';
 
 // ═══ MAIN COMPONENT ═══
 export default function GoGiverDashboard() {
   const router = useRouter();
-  const [tab, setTab] = useState<'home' | 'refer' | 'products' | 'wallet'>('home');
+  const [tab, setTab] = useState<Tab>('home');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<any[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperuser, setIsSuperuser] = useState(false);
 
   // Refer form
   const [referPhone, setReferPhone] = useState('');
@@ -51,12 +55,26 @@ export default function GoGiverDashboard() {
   // Expanded submission
   const [expandedSub, setExpandedSub] = useState<number | null>(null);
 
+  // Admin state
+  const [adminView, setAdminView] = useState<AdminView>('stats');
+  const [adminStats, setAdminStats] = useState<any>(null);
+  const [adminGivers, setAdminGivers] = useState<any>(null);
+  const [adminFeed, setAdminFeed] = useState<any[]>([]);
+  const [adminRates, setAdminRates] = useState<any[]>([]);
+  const [adminWithdrawals, setAdminWithdrawals] = useState<any[]>([]);
+  const [giverDetail, setGiverDetail] = useState<any>(null);
+  const [giverSearch, setGiverSearch] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+
   const fetchDashboard = async () => {
     try {
       const r = await fetch(`${API}/dashboard`);
       if (r.status === 401) { router.replace('/gogiver'); return; }
       const d = await r.json();
       setData(d);
+      const role = d.role || 'gogiver';
+      setIsAdmin(role === 'admin' || role === 'superuser');
+      setIsSuperuser(role === 'superuser');
     } catch {} finally { setLoading(false); }
   };
 
@@ -70,52 +88,31 @@ export default function GoGiverDashboard() {
   const fetchWallet = async () => {
     try {
       const r = await fetch(`${API}/wallet`);
-      if (r.ok) { const d = await r.json(); setWalletData(d); }
+      if (r.ok) setWalletData(await r.json());
     } catch {}
   };
 
   useEffect(() => { fetchDashboard(); fetchProducts(); }, []);
-
-  // Auto-refresh every 30s
-  useEffect(() => {
-    const interval = setInterval(fetchDashboard, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  useEffect(() => { const i = setInterval(fetchDashboard, 30000); return () => clearInterval(i); }, []);
 
   // Pusher real-time
   useEffect(() => {
     if (!data?.gogiver?.id) return;
     let pusher: any = null;
     let channel: any = null;
-
     const init = async () => {
       try {
         const PusherClient = (await import('pusher-js')).default;
         const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
         const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
         if (!key || !cluster) return;
-
         pusher = new PusherClient(key, { cluster });
         channel = pusher.subscribe(`referrer-${data.gogiver.id}`);
-
-        channel.bind('stage-update', (event: any) => {
-          setData((prev: any) => {
-            if (!prev) return prev;
-            const updateSub = (sub: any) => {
-              if (sub.order_id !== event.order_id && sub.order_number !== event.order_number) return sub;
-              const newJourney = sub.stage_journey?.map((step: any, idx: number) => {
-                const targetIdx = sub.stage_journey.findIndex((s: any) => s.key === event.to_stage);
-                return { ...step, is_current: step.key === event.to_stage, is_done: targetIdx >= 0 && idx < targetIdx, is_future: targetIdx >= 0 && idx > targetIdx };
-              });
-              return { ...sub, stage_label: event.stage_label, stage_category: event.stage_category, live_status: event.stage_category === 'COMPLETE' ? 'completed' : sub.live_status, stage_journey: newJourney };
-            };
-            return { ...prev, recent: prev.recent?.map(updateSub) };
-          });
-        });
+        channel.bind('stage-update', () => fetchDashboard());
       } catch {}
     };
     init();
-    return () => { channel?.unbind_all(); if (pusher && data?.gogiver?.id) pusher.unsubscribe(`referrer-${data.gogiver.id}`); };
+    return () => { channel?.unbind_all(); pusher?.unsubscribe(`referrer-${data.gogiver.id}`); };
   }, [data?.gogiver?.id]);
 
   const handleRefer = async () => {
@@ -123,38 +120,73 @@ export default function GoGiverDashboard() {
     setReferring(true); setReferResult(null);
     try {
       const r = await fetch(`${API}/refer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: referPhone,
-          name: referName || undefined,
-          product_id: parseInt(referProduct),
-          note: referNote || undefined,
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: referPhone, name: referName || undefined, product_id: parseInt(referProduct), note: referNote || undefined }),
       });
       const d = await r.json();
-      if (r.ok) {
-        setReferResult({ success: true, ...d });
-        setReferPhone(''); setReferName(''); setReferProduct(''); setReferNote('');
-        fetchDashboard();
-      } else {
-        setReferResult({ error: d.error || 'Submission failed' });
-      }
+      if (r.ok) { setReferResult({ success: true, ...d }); setReferPhone(''); setReferName(''); setReferProduct(''); setReferNote(''); fetchDashboard(); }
+      else setReferResult({ error: d.error || 'Failed' });
     } catch { setReferResult({ error: 'Connection failed' }); }
     finally { setReferring(false); }
   };
 
-  const logout = async () => {
-    await fetch(`${API}/auth/logout`, { method: 'POST' });
-    router.replace('/gogiver');
+  const logout = async () => { await fetch(`${API}/auth/logout`, { method: 'POST' }); router.replace('/gogiver'); };
+
+  // ─── Admin data fetchers ───
+  const fetchAdminStats = useCallback(async () => {
+    setAdminLoading(true);
+    try { const r = await fetch(`${API}/admin/stats`); if (r.ok) setAdminStats(await r.json()); } catch {} finally { setAdminLoading(false); }
+  }, []);
+
+  const fetchAdminGivers = useCallback(async (search = '') => {
+    setAdminLoading(true);
+    try { const r = await fetch(`${API}/admin/givers?search=${encodeURIComponent(search)}`); if (r.ok) setAdminGivers(await r.json()); } catch {} finally { setAdminLoading(false); }
+  }, []);
+
+  const fetchAdminFeed = useCallback(async () => {
+    setAdminLoading(true);
+    try { const r = await fetch(`${API}/admin/feed`); if (r.ok) { const d = await r.json(); setAdminFeed(d.feed || []); } } catch {} finally { setAdminLoading(false); }
+  }, []);
+
+  const fetchAdminRates = useCallback(async () => {
+    setAdminLoading(true);
+    try { const r = await fetch(`${API}/admin/rates`); if (r.ok) { const d = await r.json(); setAdminRates(d.products || []); } } catch {} finally { setAdminLoading(false); }
+  }, []);
+
+  const fetchAdminWithdrawals = useCallback(async () => {
+    setAdminLoading(true);
+    try { const r = await fetch(`${API}/admin/withdrawals`); if (r.ok) { const d = await r.json(); setAdminWithdrawals(d.withdrawals || []); } } catch {} finally { setAdminLoading(false); }
+  }, []);
+
+  const fetchGiverDetail = useCallback(async (id: number) => {
+    setAdminLoading(true);
+    try { const r = await fetch(`${API}/admin/givers/${id}`); if (r.ok) { setGiverDetail(await r.json()); setAdminView('giver_detail'); } } catch {} finally { setAdminLoading(false); }
+  }, []);
+
+  const doGiverAction = async (giverId: number, action: string) => {
+    try {
+      const r = await fetch(`${API}/admin/givers/${giverId}/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+      if (r.ok) { fetchAdminGivers(giverSearch); if (giverDetail?.giver?.id === giverId) fetchGiverDetail(giverId); }
+    } catch {}
+  };
+
+  const updateRate = async (productId: number, field: string, value: number) => {
+    try {
+      await fetch(`${API}/admin/rates/${productId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [field]: value }) });
+      fetchAdminRates();
+    } catch {}
+  };
+
+  const approveWithdrawal = async (txId: number) => {
+    try { await fetch(`${API}/admin/withdrawals/${txId}/approve`, { method: 'POST' }); fetchAdminWithdrawals(); } catch {}
+  };
+  const rejectWithdrawal = async (txId: number) => {
+    try { await fetch(`${API}/admin/withdrawals/${txId}/reject`, { method: 'POST' }); fetchAdminWithdrawals(); } catch {}
   };
 
   if (loading && !data) return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-10 h-10 border-2 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-gray-500 text-sm">Loading...</p>
-      </div>
+      <div className="w-10 h-10 border-2 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto" />
     </div>
   );
   if (!data) return null;
@@ -163,6 +195,14 @@ export default function GoGiverDashboard() {
   const wallet = data.wallet || {};
   const stats = data.stats || {};
   const recent = data.recent || [];
+
+  const tabs: [Tab, string, string][] = [
+    ['home', '🏠', 'Home'],
+    ['refer', '🎁', 'Refer'],
+    ['products', '📦', 'Products'],
+    ['wallet', '💰', 'Wallet'],
+    ...(isAdmin ? [['admin', '⚡', 'Admin'] as [Tab, string, string]] : []),
+  ];
 
   return (
     <div className="min-h-screen pb-24">
@@ -174,7 +214,10 @@ export default function GoGiverDashboard() {
               {gogiver.name?.charAt(0)?.toUpperCase() || 'G'}
             </div>
             <div>
-              <p className="text-white font-semibold text-sm">{gogiver.name || 'GoGiver'}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-white font-semibold text-sm">{gogiver.name || 'GoGiver'}</p>
+                {isAdmin && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-bold">{isSuperuser ? 'SUPER' : 'ADMIN'}</span>}
+              </div>
               <p className="text-gray-500 text-[10px] font-mono">{gogiver.referrer_code}</p>
             </div>
           </div>
@@ -187,16 +230,15 @@ export default function GoGiverDashboard() {
       {/* ═══ TAB BAR ═══ */}
       <nav className="sticky top-0 z-20 bg-[#0C0A1D]/95 backdrop-blur-md border-b border-white/[0.04]">
         <div className="max-w-2xl mx-auto flex">
-          {([
-            ['home', '🏠', 'Home'],
-            ['refer', '🎁', 'Refer'],
-            ['products', '📦', 'Products'],
-            ['wallet', '💰', 'Wallet'],
-          ] as const).map(([k, icon, label]) => (
+          {tabs.map(([k, icon, label]) => (
             <button key={k}
-              onClick={() => { setTab(k as any); if (k === 'wallet') fetchWallet(); }}
+              onClick={() => {
+                setTab(k);
+                if (k === 'wallet') fetchWallet();
+                if (k === 'admin') { setAdminView('stats'); fetchAdminStats(); }
+              }}
               className={`flex-1 py-3 flex flex-col items-center gap-0.5 text-xs font-medium transition-all ${
-                tab === k ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-600 hover:text-gray-400'
+                tab === k ? (k === 'admin' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-purple-400 border-b-2 border-purple-400') : 'text-gray-600 hover:text-gray-400'
               }`}>
               <span className="text-base">{icon}</span>
               {label}
@@ -210,26 +252,19 @@ export default function GoGiverDashboard() {
         {/* ═══════ HOME TAB ═══════ */}
         {tab === 'home' && (
           <div className="space-y-5">
-
-            {/* Wallet card */}
             <div className="bg-gradient-to-br from-purple-600/20 via-purple-900/10 to-emerald-900/10 rounded-2xl p-5 border border-purple-500/15">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-gray-400 text-xs mb-1">Your Wallet</p>
-                  <p className="text-3xl font-bold text-white">
-                    RM {(wallet.active_balance || 0).toFixed(2)}
-                  </p>
+                  <p className="text-3xl font-bold text-white">RM {(wallet.active_balance || 0).toFixed(2)}</p>
                   <p className="text-emerald-400 text-xs mt-0.5">Available to withdraw</p>
                 </div>
-                <div className="text-right">
-                  {(wallet.dormant_balance || 0) > 0 && (
-                    <div>
-                      <p className="text-gray-500 text-[10px]">Dormant</p>
-                      <p className="text-gray-400 text-sm font-semibold">RM {wallet.dormant_balance?.toFixed(2)}</p>
-                      <p className="text-gray-600 text-[9px]">Unlocks when buyer completes</p>
-                    </div>
-                  )}
-                </div>
+                {(wallet.dormant_balance || 0) > 0 && (
+                  <div className="text-right">
+                    <p className="text-gray-500 text-[10px]">Dormant</p>
+                    <p className="text-gray-400 text-sm font-semibold">RM {wallet.dormant_balance?.toFixed(2)}</p>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <MiniStat label="Referrals" value={stats.total || 0} />
@@ -238,33 +273,23 @@ export default function GoGiverDashboard() {
               </div>
             </div>
 
-            {/* Quick refer CTA */}
-            <button
-              onClick={() => setTab('refer')}
-              className="w-full py-4 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 rounded-2xl font-semibold transition-all active:scale-[0.98] shadow-lg shadow-purple-600/15 flex items-center justify-center gap-2 text-base"
-            >
-              <span className="text-xl">🎁</span>
-              Refer Someone Now
+            <button onClick={() => setTab('refer')}
+              className="w-full py-4 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 rounded-2xl font-semibold transition-all active:scale-[0.98] shadow-lg shadow-purple-600/15 flex items-center justify-center gap-2 text-base">
+              <span className="text-xl">🎁</span> Refer Someone Now
             </button>
 
-            {/* Recent Referrals */}
             <div>
               <h3 className="text-gray-500 text-xs font-medium mb-3">Recent Referrals</h3>
               {recent.length === 0 ? (
                 <div className="bg-white/[0.02] rounded-2xl p-8 text-center border border-white/[0.04]">
                   <p className="text-3xl mb-2">🎯</p>
                   <p className="text-gray-400 text-sm">No referrals yet</p>
-                  <p className="text-gray-600 text-xs mt-1">Share with a friend and start earning!</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {recent.map((sub: any) => (
-                    <ReferralCard
-                      key={sub.id}
-                      sub={sub}
-                      expanded={expandedSub === sub.id}
-                      onToggle={() => setExpandedSub(expandedSub === sub.id ? null : sub.id)}
-                    />
+                    <ReferralCard key={sub.id} sub={sub} expanded={expandedSub === sub.id}
+                      onToggle={() => setExpandedSub(expandedSub === sub.id ? null : sub.id)} />
                   ))}
                 </div>
               )}
@@ -279,103 +304,39 @@ export default function GoGiverDashboard() {
               <h2 className="text-xl font-bold mb-1">Refer a Friend</h2>
               <p className="text-gray-400 text-sm">Share their details and our AI will reach out instantly.</p>
             </div>
-
             <div className="bg-white/[0.03] rounded-2xl border border-white/[0.06] p-5 space-y-4">
-              {/* Product */}
               <div>
                 <label className="text-gray-400 text-xs font-medium block mb-2">Service / Product *</label>
-                <select
-                  value={referProduct}
-                  onChange={e => setReferProduct(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-purple-500/50 focus:outline-none appearance-none"
-                >
+                <select value={referProduct} onChange={e => setReferProduct(e.target.value)}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-purple-500/50 focus:outline-none appearance-none">
                   <option value="">Choose a service...</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}{p.gg_giver_reward ? ` — Earn RM${p.gg_giver_reward}` : ''}</option>
-                  ))}
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.gg_giver_reward ? ` — Earn RM${p.gg_giver_reward}` : ''}</option>)}
                 </select>
               </div>
-
-              {/* Phone */}
               <div>
                 <label className="text-gray-400 text-xs font-medium block mb-2">Their WhatsApp Number *</label>
-                <input
-                  value={referPhone}
-                  onChange={e => setReferPhone(e.target.value)}
-                  placeholder="012 345 6789"
-                  type="tel"
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:ring-2 focus:ring-purple-500/50 focus:outline-none font-mono text-lg tracking-wider"
-                />
+                <input value={referPhone} onChange={e => setReferPhone(e.target.value)} placeholder="012 345 6789" type="tel"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:ring-2 focus:ring-purple-500/50 focus:outline-none font-mono text-lg tracking-wider" />
               </div>
-
-              {/* Name (optional) */}
               <div>
                 <label className="text-gray-400 text-xs font-medium block mb-2">Their Name <span className="text-gray-600">(optional)</span></label>
-                <input
-                  value={referName}
-                  onChange={e => setReferName(e.target.value)}
-                  placeholder="Ahmad"
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:ring-2 focus:ring-purple-500/50 focus:outline-none"
-                />
+                <input value={referName} onChange={e => setReferName(e.target.value)} placeholder="Ahmad"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:ring-2 focus:ring-purple-500/50 focus:outline-none" />
               </div>
-
-              {/* Note (optional) */}
               <div>
-                <label className="text-gray-400 text-xs font-medium block mb-2">Any extra context <span className="text-gray-600">(optional)</span></label>
-                <textarea
-                  value={referNote}
-                  onChange={e => setReferNote(e.target.value)}
-                  placeholder="e.g. They're moving to a new house, need internet ASAP"
-                  rows={2}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:ring-2 focus:ring-purple-500/50 focus:outline-none resize-none text-sm"
-                />
+                <label className="text-gray-400 text-xs font-medium block mb-2">Extra context <span className="text-gray-600">(optional)</span></label>
+                <textarea value={referNote} onChange={e => setReferNote(e.target.value)} placeholder="e.g. Moving to new house, needs internet ASAP" rows={2}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:ring-2 focus:ring-purple-500/50 focus:outline-none resize-none text-sm" />
               </div>
-
-              {/* Result */}
               {referResult && (
                 <div className={`rounded-xl px-4 py-3 text-sm ${referResult.success ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                  {referResult.success ? (
-                    <>✅ Referral submitted! Our AI is contacting them now.</>
-                  ) : (
-                    <>{referResult.error}</>
-                  )}
+                  {referResult.success ? '✅ Referral submitted! AI is contacting them now.' : referResult.error}
                 </div>
               )}
-
-              {/* Submit */}
-              <button
-                onClick={handleRefer}
-                disabled={referring || !referPhone.trim() || !referProduct}
-                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white rounded-xl font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-purple-600/15 active:scale-[0.98]"
-              >
-                {referring ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Sending...
-                  </span>
-                ) : '🎁 Submit Referral'}
+              <button onClick={handleRefer} disabled={referring || !referPhone.trim() || !referProduct}
+                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white rounded-xl font-semibold transition-all disabled:opacity-40 shadow-lg shadow-purple-600/15 active:scale-[0.98]">
+                {referring ? <Spinner /> : '🎁 Submit Referral'}
               </button>
-            </div>
-
-            {/* How it works */}
-            <div className="bg-white/[0.02] rounded-2xl border border-white/[0.04] p-5">
-              <p className="text-gray-400 text-xs font-medium mb-3">How It Works</p>
-              <div className="space-y-3">
-                {[
-                  { step: '1', title: 'You share their number', desc: 'Just tell us who might be interested' },
-                  { step: '2', title: 'AI reaches out via WhatsApp', desc: 'Natural conversation, not spam' },
-                  { step: '3', title: 'They sign up', desc: 'AI handles everything — forms, docs, follow-up' },
-                  { step: '4', title: 'You both earn', desc: 'Commission hits your wallet automatically' },
-                ].map(s => (
-                  <div key={s.step} className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-purple-500/15 text-purple-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.step}</span>
-                    <div>
-                      <p className="text-white text-sm font-medium">{s.title}</p>
-                      <p className="text-gray-500 text-xs">{s.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         )}
@@ -383,45 +344,27 @@ export default function GoGiverDashboard() {
         {/* ═══════ PRODUCTS TAB ═══════ */}
         {tab === 'products' && (
           <div className="space-y-5">
-            <div>
-              <h2 className="text-xl font-bold mb-1">Products & Rates</h2>
-              <p className="text-gray-400 text-sm">See what you can earn per successful referral.</p>
-            </div>
-
-            {products.length === 0 ? (
-              <div className="bg-white/[0.02] rounded-2xl p-8 text-center border border-white/[0.04]">
-                <p className="text-gray-500">No products available yet</p>
-              </div>
-            ) : (
+            <h2 className="text-xl font-bold">Products & Rates</h2>
+            {products.length === 0 ? <EmptyState text="No products available" /> : (
               <div className="space-y-3">
                 {products.map((p: any) => (
                   <div key={p.id} className="bg-white/[0.03] rounded-2xl border border-white/[0.06] p-5 hover:border-purple-500/20 transition-colors">
-                    <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-start justify-between mb-2">
                       <div>
                         <h3 className="text-white font-semibold">{p.name}</h3>
                         {p.description && <p className="text-gray-500 text-xs mt-0.5">{p.description}</p>}
-                        {p.category && <span className="text-purple-400/50 text-[10px] font-mono">{p.category}</span>}
                       </div>
-                      {p.gg_giver_reward && (
+                      {p.gg_giver_reward > 0 && (
                         <div className="text-right flex-shrink-0">
                           <p className="text-emerald-400 text-lg font-bold">RM{p.gg_giver_reward}</p>
                           <p className="text-gray-600 text-[10px]">your commission</p>
                         </div>
                       )}
                     </div>
-
-                    {(p.gg_buyer_reward || p.gg_giver_reward) && (
+                    {(p.gg_buyer_reward > 0 || p.gg_giver_reward > 0) && (
                       <div className="flex gap-2">
-                        {p.gg_buyer_reward && (
-                          <span className="text-[10px] px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/10">
-                            Buyer gets RM{p.gg_buyer_reward}
-                          </span>
-                        )}
-                        {p.gg_giver_reward && (
-                          <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/10">
-                            You earn RM{p.gg_giver_reward}
-                          </span>
-                        )}
+                        {p.gg_buyer_reward > 0 && <Badge text={`Buyer gets RM${p.gg_buyer_reward}`} color="blue" />}
+                        {p.gg_giver_reward > 0 && <Badge text={`You earn RM${p.gg_giver_reward}`} color="emerald" />}
                       </div>
                     )}
                   </div>
@@ -434,12 +377,7 @@ export default function GoGiverDashboard() {
         {/* ═══════ WALLET TAB ═══════ */}
         {tab === 'wallet' && (
           <div className="space-y-5">
-            <div>
-              <h2 className="text-xl font-bold mb-1">Wallet</h2>
-              <p className="text-gray-400 text-sm">Your earnings and withdrawal history.</p>
-            </div>
-
-            {/* Balance cards */}
+            <h2 className="text-xl font-bold">Wallet</h2>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-gradient-to-br from-emerald-600/15 to-emerald-900/10 rounded-2xl p-4 border border-emerald-500/15">
                 <p className="text-gray-400 text-[10px] font-medium mb-1">ACTIVE</p>
@@ -452,7 +390,6 @@ export default function GoGiverDashboard() {
                 <p className="text-gray-600 text-[10px] mt-0.5">Pending completion</p>
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.06]">
                 <p className="text-gray-500 text-[10px]">Total Earned</p>
@@ -463,29 +400,19 @@ export default function GoGiverDashboard() {
                 <p className="text-white text-lg font-bold">RM {(wallet.total_withdrawn || 0).toFixed(2)}</p>
               </div>
             </div>
-
-            {/* Withdrawal button */}
-            <button
-              disabled={(wallet.active_balance || 0) < 50}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-emerald-600/15 active:scale-[0.98]"
-            >
-              {(wallet.active_balance || 0) < 50 ? `Min RM50 to withdraw (RM${(50 - (wallet.active_balance || 0)).toFixed(2)} more)` : 'Request Withdrawal'}
+            <button disabled={(wallet.active_balance || 0) < 50}
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl font-semibold transition-all disabled:opacity-30 shadow-lg shadow-emerald-600/15 active:scale-[0.98]">
+              {(wallet.active_balance || 0) < 50 ? `Min RM50 to withdraw` : 'Request Withdrawal'}
             </button>
-
-            {/* Transaction history */}
             <div>
               <p className="text-gray-500 text-xs font-medium mb-3">Recent Transactions</p>
-              {(walletData?.transactions || []).length === 0 ? (
-                <div className="bg-white/[0.02] rounded-xl p-6 text-center border border-white/[0.04]">
-                  <p className="text-gray-600 text-sm">No transactions yet</p>
-                </div>
-              ) : (
+              {(walletData?.transactions || []).length === 0 ? <EmptyState text="No transactions yet" /> : (
                 <div className="space-y-1.5">
                   {(walletData?.transactions || []).map((tx: any, i: number) => (
                     <div key={i} className="flex items-center justify-between bg-white/[0.02] rounded-xl px-4 py-3 border border-white/[0.04]">
                       <div>
                         <p className="text-white text-sm">{tx.description}</p>
-                        <p className="text-gray-600 text-[10px]">{new Date(tx.created_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        <p className="text-gray-600 text-[10px]">{new Date(tx.created_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })}</p>
                       </div>
                       <span className={`font-bold text-sm ${tx.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                         {tx.amount > 0 ? '+' : ''}RM{Math.abs(tx.amount).toFixed(2)}
@@ -495,15 +422,257 @@ export default function GoGiverDashboard() {
                 </div>
               )}
             </div>
+          </div>
+        )}
 
-            {/* Explanation */}
-            <div className="bg-purple-500/5 rounded-2xl p-4 border border-purple-500/10">
-              <p className="text-purple-300 text-xs font-medium mb-2">How Earnings Work</p>
-              <div className="space-y-2 text-gray-400 text-xs leading-relaxed">
-                <p><span className="text-emerald-400">Active balance</span> — money you can withdraw anytime. Earned when the person you referred completes their sign-up.</p>
-                <p><span className="text-gray-300">Dormant balance</span> — reserved when your referral starts the process. Moves to active once they complete. If they cancel, the dormant amount is removed.</p>
-              </div>
+        {/* ═══════ ADMIN TAB ═══════ */}
+        {tab === 'admin' && isAdmin && (
+          <div className="space-y-5">
+            {/* Admin sub-nav */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+              {([
+                ['stats', '📊', 'Stats'],
+                ['givers', '👥', 'GoGivers'],
+                ['feed', '📡', 'Live Feed'],
+                ...(isSuperuser ? [['rates', '💲', 'Rates'], ['withdrawals', '🏦', 'Withdrawals']] : []),
+              ] as [AdminView, string, string][]).map(([k, icon, label]) => (
+                <button key={k}
+                  onClick={() => {
+                    setAdminView(k);
+                    if (k === 'stats') fetchAdminStats();
+                    if (k === 'givers') fetchAdminGivers(giverSearch);
+                    if (k === 'feed') fetchAdminFeed();
+                    if (k === 'rates') fetchAdminRates();
+                    if (k === 'withdrawals') fetchAdminWithdrawals();
+                  }}
+                  className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                    adminView === k ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-white/5 text-gray-500 border border-white/[0.06] hover:text-gray-300'
+                  }`}>
+                  {icon} {label}
+                </button>
+              ))}
             </div>
+
+            {adminLoading && <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" /></div>}
+
+            {/* ─── STATS ─── */}
+            {adminView === 'stats' && adminStats && !adminLoading && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <StatCard label="Total GoGivers" value={adminStats.givers?.total || 0} sub={`${adminStats.givers?.active || 0} active · ${adminStats.givers?.dormant || 0} dormant`} accent="purple" />
+                  <StatCard label="Total Referrals" value={adminStats.submissions?.total || 0} sub={`${adminStats.submissions?.this_week || 0} this week`} accent="blue" />
+                  <StatCard label="Converted" value={adminStats.submissions?.converted || 0} sub={`${adminStats.submissions?.active || 0} in progress`} accent="emerald" />
+                  <StatCard label="Commission Paid" value={`RM${(adminStats.submissions?.total_commission_paid || 0).toFixed(0)}`} sub={`RM${(adminStats.givers?.total_wallet || 0).toFixed(0)} in wallets`} accent="amber" />
+                </div>
+                {adminStats.submissions?.failed > 0 && (
+                  <div className="bg-red-500/10 rounded-xl px-4 py-2 border border-red-500/15 text-red-400 text-xs">
+                    ⚠️ {adminStats.submissions.failed} failed referrals · {adminStats.submissions.lost || 0} lost
+                  </div>
+                )}
+                {adminStats.pending_withdrawals > 0 && (
+                  <button onClick={() => { setAdminView('withdrawals'); fetchAdminWithdrawals(); }}
+                    className="w-full bg-amber-500/10 rounded-xl px-4 py-3 border border-amber-500/15 text-amber-400 text-sm font-medium text-left">
+                    🏦 {adminStats.pending_withdrawals} pending withdrawal{adminStats.pending_withdrawals > 1 ? 's' : ''} → Review
+                  </button>
+                )}
+                <div>
+                  <h3 className="text-gray-500 text-xs font-medium mb-2">Top Performers (This Month)</h3>
+                  <div className="space-y-1.5">
+                    {(adminStats.top_performers || []).map((p: any, i: number) => (
+                      <div key={p.id} onClick={() => fetchGiverDetail(p.id)}
+                        className="flex items-center gap-3 bg-white/[0.03] rounded-xl px-4 py-3 border border-white/[0.04] cursor-pointer hover:border-amber-500/20 transition-colors">
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-yellow-500 text-black' : i === 1 ? 'bg-gray-400 text-black' : i === 2 ? 'bg-amber-700 text-white' : 'bg-white/10 text-gray-500'}`}>{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-medium truncate">{p.name || p.phone}</p>
+                          <p className="text-gray-600 text-[10px]">{p.referrals} referrals · {p.converted} converted</p>
+                        </div>
+                        <span className="text-emerald-400 text-sm font-bold">RM{p.earned}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── GIVERS LIST ─── */}
+            {adminView === 'givers' && !adminLoading && (
+              <div className="space-y-4">
+                <input value={giverSearch} onChange={e => { setGiverSearch(e.target.value); fetchAdminGivers(e.target.value); }}
+                  placeholder="Search name, phone, or code..." className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:ring-2 focus:ring-amber-500/50 focus:outline-none text-sm" />
+                {adminGivers && (
+                  <>
+                    <p className="text-gray-600 text-xs">{adminGivers.total} gogivers</p>
+                    <div className="space-y-2">
+                      {(adminGivers.givers || []).map((g: any) => (
+                        <div key={g.id} onClick={() => fetchGiverDetail(g.id)}
+                          className="bg-white/[0.03] rounded-xl px-4 py-3 border border-white/[0.04] cursor-pointer hover:border-amber-500/20 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-white text-sm font-medium">{g.name || 'Unnamed'}</p>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded ${g.status === 'active' ? 'bg-emerald-500/15 text-emerald-400' : g.status === 'dormant' ? 'bg-gray-500/15 text-gray-400' : 'bg-red-500/15 text-red-400'}`}>{g.status}</span>
+                                {g.admin_level && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-bold">{g.admin_level.toUpperCase()}</span>}
+                              </div>
+                              <p className="text-gray-600 text-[10px] font-mono">{g.phone} · {g.referrer_code}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-emerald-400 text-sm font-bold">RM{parseFloat(g.wallet_balance || 0).toFixed(0)}</p>
+                              <p className="text-gray-600 text-[10px]">{g.total_referrals} refs · {g.converted} conv</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* ─── GIVER DETAIL ─── */}
+            {adminView === 'giver_detail' && giverDetail && !adminLoading && (
+              <div className="space-y-4">
+                <button onClick={() => { setAdminView('givers'); fetchAdminGivers(giverSearch); }}
+                  className="text-gray-500 text-xs hover:text-white transition-colors">← Back to list</button>
+
+                <div className="bg-white/[0.03] rounded-2xl border border-white/[0.06] p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="text-white text-lg font-bold">{giverDetail.giver.name || 'Unnamed'}</h3>
+                      <p className="text-gray-500 text-xs font-mono">{giverDetail.giver.phone} · {giverDetail.giver.referrer_code}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded ${giverDetail.giver.status === 'active' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>{giverDetail.giver.status}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <MiniStat label="Wallet" value={`RM${parseFloat(giverDetail.giver.wallet_balance || 0).toFixed(0)}`} accent="emerald" />
+                    <MiniStat label="Earned" value={`RM${parseFloat(giverDetail.giver.total_points || 0).toFixed(0)}`} />
+                    <MiniStat label="Withdrawn" value={`RM${parseFloat(giverDetail.giver.total_withdrawn || 0).toFixed(0)}`} />
+                  </div>
+                  {/* Actions */}
+                  <div className="flex gap-2 flex-wrap">
+                    {giverDetail.giver.status === 'active' && (
+                      <button onClick={() => doGiverAction(giverDetail.giver.id, 'suspend')} className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs hover:bg-red-500/20 transition-colors">Suspend</button>
+                    )}
+                    {giverDetail.giver.status === 'suspended' && (
+                      <button onClick={() => doGiverAction(giverDetail.giver.id, 'activate')} className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs hover:bg-emerald-500/20 transition-colors">Activate</button>
+                    )}
+                    {isSuperuser && !giverDetail.giver.metadata?.admin_level && (
+                      <button onClick={() => doGiverAction(giverDetail.giver.id, 'set_admin')} className="px-3 py-1.5 bg-amber-500/10 text-amber-400 rounded-lg text-xs hover:bg-amber-500/20 transition-colors">Make Admin</button>
+                    )}
+                    {isSuperuser && giverDetail.giver.metadata?.admin_level && (
+                      <button onClick={() => doGiverAction(giverDetail.giver.id, 'remove_admin')} className="px-3 py-1.5 bg-gray-500/10 text-gray-400 rounded-lg text-xs hover:bg-gray-500/20 transition-colors">Remove Admin</button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Upline / Downline */}
+                {giverDetail.upline && (
+                  <div className="bg-purple-500/5 rounded-xl px-4 py-3 border border-purple-500/10">
+                    <p className="text-purple-400 text-[10px] font-medium mb-1">UPLINE</p>
+                    <p className="text-white text-sm">{giverDetail.upline.name} <span className="text-gray-600 text-[10px] font-mono">{giverDetail.upline.phone}</span></p>
+                  </div>
+                )}
+                {giverDetail.downline?.length > 0 && (
+                  <div>
+                    <p className="text-gray-500 text-xs font-medium mb-2">Downline ({giverDetail.downline.length})</p>
+                    <div className="space-y-1.5">
+                      {giverDetail.downline.map((d: any) => (
+                        <div key={d.id} onClick={() => fetchGiverDetail(d.id)}
+                          className="flex items-center justify-between bg-white/[0.02] rounded-xl px-3 py-2 border border-white/[0.04] cursor-pointer hover:border-purple-500/20 transition-colors">
+                          <div>
+                            <p className="text-white text-sm">{d.name || d.phone}</p>
+                            <span className={`text-[9px] ${d.status === 'active' ? 'text-emerald-400' : 'text-gray-500'}`}>{d.status}</span>
+                          </div>
+                          <span className="text-gray-400 text-xs">RM{parseFloat(d.wallet_balance || 0).toFixed(0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Submissions */}
+                <div>
+                  <p className="text-gray-500 text-xs font-medium mb-2">Submissions ({giverDetail.submissions?.length || 0})</p>
+                  <div className="space-y-2">
+                    {(giverDetail.submissions || []).map((s: any) => (
+                      <ReferralCard key={s.id} sub={s} expanded={expandedSub === s.id}
+                        onToggle={() => setExpandedSub(expandedSub === s.id ? null : s.id)} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── LIVE FEED ─── */}
+            {adminView === 'feed' && !adminLoading && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-white font-semibold">Live Referral Feed</h3>
+                  <button onClick={fetchAdminFeed} className="text-amber-400 text-xs hover:text-amber-300">↻ Refresh</button>
+                </div>
+                {adminFeed.length === 0 ? <EmptyState text="No referrals yet" /> : (
+                  <div className="space-y-2">
+                    {adminFeed.map((s: any) => (
+                      <div key={s.id} className="bg-white/[0.03] rounded-xl px-4 py-3 border border-white/[0.04]">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-amber-400 text-xs font-medium">{s.gogiver_name || s.gogiver_phone}</span>
+                            <span className="text-gray-700">→</span>
+                            <span className="text-white text-xs">{s.customer_name || s.customer_phone}</span>
+                          </div>
+                          <StatusBadge sub={s} />
+                        </div>
+                        <p className="text-gray-600 text-[10px]">{s.product_name} · {new Date(s.created_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── RATES (superuser) ─── */}
+            {adminView === 'rates' && isSuperuser && !adminLoading && (
+              <div className="space-y-4">
+                <h3 className="text-white font-semibold">Commission Rates</h3>
+                <div className="space-y-2">
+                  {adminRates.map((p: any) => (
+                    <div key={p.id} className="bg-white/[0.03] rounded-xl px-4 py-3 border border-white/[0.06]">
+                      <p className="text-white text-sm font-medium mb-2">{p.name} <span className="text-gray-600 text-[10px]">{p.category}</span></p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <RateInput label="Buyer RM" value={p.gg_buyer_reward || 0} onSave={v => updateRate(p.id, 'gg_buyer_reward', v)} />
+                        <RateInput label="Giver RM" value={p.gg_giver_reward || 0} onSave={v => updateRate(p.id, 'gg_giver_reward', v)} />
+                        <RateInput label="Upline %" value={Math.round((p.gg_upline_pct || 0) * 100)} onSave={v => updateRate(p.id, 'gg_upline_pct', v / 100)} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ─── WITHDRAWALS (superuser) ─── */}
+            {adminView === 'withdrawals' && isSuperuser && !adminLoading && (
+              <div className="space-y-4">
+                <h3 className="text-white font-semibold">Pending Withdrawals</h3>
+                {adminWithdrawals.length === 0 ? <EmptyState text="No pending withdrawals" /> : (
+                  <div className="space-y-2">
+                    {adminWithdrawals.map((w: any) => (
+                      <div key={w.id} className="bg-white/[0.03] rounded-xl px-4 py-3 border border-white/[0.06]">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-white text-sm font-medium">{w.name}</p>
+                            <p className="text-gray-600 text-[10px] font-mono">{w.phone} · Balance: RM{parseFloat(w.wallet_balance || 0).toFixed(2)}</p>
+                          </div>
+                          <p className="text-amber-400 text-lg font-bold">RM{parseFloat(w.amount).toFixed(2)}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => approveWithdrawal(w.id)} className="flex-1 py-2 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-medium hover:bg-emerald-500/20 transition-colors">✓ Approve</button>
+                          <button onClick={() => rejectWithdrawal(w.id)} className="flex-1 py-2 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20 transition-colors">✕ Reject</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -511,13 +680,63 @@ export default function GoGiverDashboard() {
   );
 }
 
-// ═══ MINI STAT ═══
-function MiniStat({ label, value, accent }: { label: string; value: number; accent?: string }) {
-  const colors = accent === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' : accent === 'purple' ? 'bg-purple-500/10 text-purple-400' : 'bg-white/5 text-white';
+// ═══ SHARED COMPONENTS ═══
+
+function Spinner() {
+  return <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending...</span>;
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <div className="bg-white/[0.02] rounded-2xl p-8 text-center border border-white/[0.04]"><p className="text-gray-600 text-sm">{text}</p></div>;
+}
+
+function Badge({ text, color }: { text: string; color: string }) {
+  return <span className={`text-[10px] px-2.5 py-1 rounded-full bg-${color}-500/10 text-${color}-400 border border-${color}-500/10`}>{text}</span>;
+}
+
+function MiniStat({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
+  const c = accent === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' : accent === 'purple' ? 'bg-purple-500/10 text-purple-400' : accent === 'amber' ? 'bg-amber-500/10 text-amber-400' : 'bg-white/5 text-white';
+  return <div className={`${c} rounded-xl p-2.5 text-center`}><p className="text-lg font-bold">{value}</p><p className="text-[10px] opacity-60">{label}</p></div>;
+}
+
+function StatCard({ label, value, sub, accent }: { label: string; value: number | string; sub: string; accent: string }) {
+  const c = accent === 'emerald' ? 'border-emerald-500/15' : accent === 'purple' ? 'border-purple-500/15' : accent === 'amber' ? 'border-amber-500/15' : 'border-blue-500/15';
+  const tc = accent === 'emerald' ? 'text-emerald-400' : accent === 'purple' ? 'text-purple-400' : accent === 'amber' ? 'text-amber-400' : 'text-blue-400';
   return (
-    <div className={`${colors} rounded-xl p-2.5 text-center`}>
-      <p className="text-lg font-bold">{value}</p>
-      <p className="text-[10px] opacity-60">{label}</p>
+    <div className={`bg-white/[0.03] rounded-2xl p-4 border ${c}`}>
+      <p className="text-gray-500 text-[10px] font-medium mb-1">{label}</p>
+      <p className={`${tc} text-2xl font-bold`}>{value}</p>
+      <p className="text-gray-600 text-[10px] mt-0.5">{sub}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ sub }: { sub: any }) {
+  const status = sub.live_status || sub.status || 'pending';
+  const conf = STATUS_CONF[status] || STATUS_CONF.pending;
+  const cat = sub.stage_category;
+  if (cat) {
+    const s = CATEGORY_STYLE[cat] || CATEGORY_STYLE.PENDING;
+    return <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${s.bg} ${s.text}`}>{sub.stage_label || cat}</span>;
+  }
+  return <span className={`text-[10px] ${conf.color}`}>{conf.emoji} {conf.label}</span>;
+}
+
+function RateInput({ label, value, onSave }: { label: string; value: number; onSave: (v: number) => void }) {
+  const [val, setVal] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+  return (
+    <div>
+      <p className="text-gray-500 text-[9px] mb-0.5">{label}</p>
+      {editing ? (
+        <div className="flex gap-1">
+          <input value={val} onChange={e => setVal(e.target.value)} autoFocus
+            className="w-full px-2 py-1 bg-white/10 border border-amber-500/30 rounded text-white text-sm focus:outline-none" type="number" step="any" />
+          <button onClick={() => { onSave(parseFloat(val) || 0); setEditing(false); }} className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs">✓</button>
+        </div>
+      ) : (
+        <button onClick={() => setEditing(true)} className="w-full px-2 py-1 bg-white/5 rounded text-white text-sm text-left hover:bg-white/10 transition-colors">{value}</button>
+      )}
     </div>
   );
 }
@@ -526,139 +745,69 @@ function MiniStat({ label, value, accent }: { label: string; value: number; acce
 function ReferralCard({ sub, expanded, onToggle }: { sub: any; expanded: boolean; onToggle: () => void }) {
   const status = sub.live_status || sub.status || 'pending';
   const conf = STATUS_CONF[status] || STATUS_CONF.pending;
-  const isTerminal = ['cancelled', 'rejected', 'dropped', 'no_response', 'failed', 'inject_failed'].includes(status);
+  const isTerminal = ['cancelled', 'dropped', 'failed', 'inject_failed'].includes(status);
   const isComplete = status === 'completed';
 
   return (
-    <div
-      onClick={onToggle}
-      className={`bg-white/[0.03] rounded-2xl border transition-all cursor-pointer ${
-        expanded ? 'border-purple-500/20 shadow-lg shadow-purple-900/10' : 'border-white/[0.04] hover:border-white/[0.08]'
-      }`}
-    >
-      {/* Header row */}
+    <div onClick={onToggle}
+      className={`bg-white/[0.03] rounded-2xl border transition-all cursor-pointer ${expanded ? 'border-purple-500/20 shadow-lg shadow-purple-900/10' : 'border-white/[0.04] hover:border-white/[0.08]'}`}>
       <div className="px-4 py-3.5 flex items-center justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-white font-medium text-sm truncate">{sub.customer_name || 'Customer'}</p>
             {sub.product_name && <span className="text-gray-600 text-[10px] truncate">{sub.product_name}</span>}
           </div>
-          <p className="text-gray-600 text-[10px] mt-0.5">
-            {new Date(sub.created_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })}
-            {sub.submission_type === 'lead' ? ' · Lead' : ' · Sale'}
-          </p>
+          <p className="text-gray-600 text-[10px] mt-0.5">{new Date(sub.created_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })}</p>
         </div>
-
-        {/* Status badge */}
-        {sub.stage_category ? (
-          <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${CATEGORY_STYLE[sub.stage_category]?.bg || 'bg-gray-500/15'} ${CATEGORY_STYLE[sub.stage_category]?.text || 'text-gray-400'}`}>
-            {sub.stage_label || sub.stage_category}
-          </span>
-        ) : (
-          <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${
-            isComplete ? 'bg-emerald-500/15 text-emerald-400' :
-            isTerminal ? 'bg-red-500/10 text-red-400' :
-            'bg-purple-500/10 text-purple-400'
-          }`}>
-            {conf.emoji} {conf.label}
-          </span>
-        )}
+        <StatusBadge sub={sub} />
       </div>
 
-      {/* Mini pipeline */}
-      {!expanded && sub.stage_journey && sub.stage_journey.length > 0 && (
+      {!expanded && sub.stage_journey?.length > 0 && (
         <div className="px-4 pb-3 flex items-center gap-0.5">
           {sub.stage_journey.map((step: any, i: number) => (
             <div key={step.key} className="flex items-center gap-0.5">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold transition-all ${
-                step.is_current ? 'ring-1 ring-purple-400/50 text-white' : step.is_done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-gray-700'
-              }`}
-                style={step.is_current ? { backgroundColor: step.color + '35' } : {}}
-              >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold ${step.is_current ? 'ring-1 ring-purple-400/50 text-white' : step.is_done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-gray-700'}`}
+                style={step.is_current ? { backgroundColor: step.color + '35' } : {}}>
                 {step.is_done ? '✓' : step.is_current ? '●' : '○'}
               </div>
-              {i < sub.stage_journey.length - 1 && (
-                <div className={`w-2 h-0.5 rounded-full ${step.is_done ? 'bg-emerald-500/40' : 'bg-white/5'}`} />
-              )}
+              {i < sub.stage_journey.length - 1 && <div className={`w-2 h-0.5 rounded-full ${step.is_done ? 'bg-emerald-500/40' : 'bg-white/5'}`} />}
             </div>
           ))}
         </div>
       )}
 
-      {/* Expanded details */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-white/[0.04] pt-3 space-y-3">
-          {/* Commission info */}
-          {sub.commission_amount && (
+          {sub.commission_amount > 0 && (
             <div className="flex items-center gap-2">
               <span className="text-emerald-400 text-xs font-bold">💰 RM{sub.commission_amount}</span>
-              <span className="text-gray-600 text-[10px]">
-                {isComplete ? 'earned' : 'pending completion'}
-              </span>
+              <span className="text-gray-600 text-[10px]">{isComplete ? 'earned' : 'pending'}</span>
             </div>
           )}
-
-          {/* Details */}
-          {sub.contact_number && (
-            <div className="text-xs">
-              <span className="text-gray-500">Phone: </span>
-              <span className="text-gray-300 font-mono">{sub.contact_number}</span>
-            </div>
-          )}
-          {sub.package && (
-            <div className="text-xs">
-              <span className="text-gray-500">Package: </span>
-              <span className="text-gray-300">{sub.package}</span>
-            </div>
-          )}
-
-          {/* Full CRM pipeline */}
-          {sub.stage_journey && sub.stage_journey.length > 0 && (
+          {sub.contact_number && <p className="text-xs"><span className="text-gray-500">Phone: </span><span className="text-gray-300 font-mono">{sub.contact_number}</span></p>}
+          {sub.package && <p className="text-xs"><span className="text-gray-500">Package: </span><span className="text-gray-300">{sub.package}</span></p>}
+          {sub.stage_journey?.length > 0 && (
             <div>
               <p className="text-gray-500 text-[10px] font-medium mb-2">Progress</p>
-              <StagePipeline journey={sub.stage_journey} />
+              <div className="flex items-center gap-0.5 overflow-x-auto pb-1">
+                {sub.stage_journey.map((stage: any, i: number) => (
+                  <div key={stage.key} className="flex items-center gap-0.5 flex-shrink-0">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${stage.is_current ? 'ring-2 ring-offset-1 ring-offset-[#0C0A1D] scale-110 text-white' : stage.is_done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-gray-600'}`}
+                        style={stage.is_current ? { backgroundColor: stage.color + '40', boxShadow: `0 0 12px ${stage.color}30` } : {}}>
+                        {stage.is_done ? '✓' : stage.is_current ? '●' : '○'}
+                      </div>
+                      <span className={`text-[7px] max-w-[46px] text-center leading-tight truncate ${stage.is_current ? 'text-white font-semibold' : stage.is_done ? 'text-emerald-400/60' : 'text-gray-600'}`}>{stage.label}</span>
+                    </div>
+                    {i < sub.stage_journey.length - 1 && <div className={`w-2.5 h-0.5 flex-shrink-0 rounded-full ${stage.is_done ? 'bg-emerald-500/50' : 'bg-white/10'}`} />}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-
-          {/* Order number */}
-          {sub.order_number && (
-            <p className="text-gray-600 text-[10px] font-mono">Order: {sub.order_number}</p>
-          )}
+          {sub.order_number && <p className="text-gray-600 text-[10px] font-mono">Order: {sub.order_number}</p>}
         </div>
       )}
-    </div>
-  );
-}
-
-// ═══ STAGE PIPELINE ═══
-function StagePipeline({ journey }: { journey: any[] }) {
-  return (
-    <div className="flex items-center gap-0.5 overflow-x-auto pb-1 -mx-1 px-1">
-      {journey.map((stage: any, i: number) => (
-        <div key={stage.key} className="flex items-center gap-0.5 flex-shrink-0">
-          <div className="flex flex-col items-center gap-0.5">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold transition-all
-                ${stage.is_current
-                  ? 'ring-2 ring-offset-1 ring-offset-[#0C0A1D] scale-110 text-white'
-                  : stage.is_done
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : 'bg-white/5 text-gray-600'
-                }`}
-              style={stage.is_current ? { backgroundColor: stage.color + '40', boxShadow: `0 0 12px ${stage.color}30` } : {}}
-            >
-              {stage.is_done ? '✓' : stage.is_current ? '●' : '○'}
-            </div>
-            <span className={`text-[7px] max-w-[46px] text-center leading-tight truncate
-              ${stage.is_current ? 'text-white font-semibold' : stage.is_done ? 'text-emerald-400/60' : 'text-gray-600'}`}>
-              {stage.label}
-            </span>
-          </div>
-          {i < journey.length - 1 && (
-            <div className={`w-2.5 h-0.5 flex-shrink-0 rounded-full ${stage.is_done ? 'bg-emerald-500/50' : 'bg-white/10'}`} />
-          )}
-        </div>
-      ))}
     </div>
   );
 }
