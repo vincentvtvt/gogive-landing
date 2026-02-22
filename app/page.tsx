@@ -39,6 +39,17 @@ export default function Home() {
       {/* NAV */}
       <nav>
         <a className="logo" href="#">
+          <svg className="logo-icon" width="32" height="32" viewBox="0 0 40 40">
+            <defs>
+              <linearGradient id="orb" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#038004" />
+                <stop offset="50%" stopColor="#32C53C" />
+                <stop offset="100%" stopColor="#45C696" />
+              </linearGradient>
+            </defs>
+            <circle cx="20" cy="20" r="18" fill="url(#orb)" />
+            <path d="M22 8L12 22h7l-2 10 10-14h-7l2-10z" fill="#1A1A1A" opacity="0.85"/>
+          </svg>
           <span className="go">Go</span><span className="give">Give</span>
         </a>
         <div className="nav-r">
@@ -53,6 +64,7 @@ export default function Home() {
       <section className="hero">
         <div className="hero-top">
           <div className="hero-text rv">
+            <div className="hero-tag">Powered by AI — Driven by You</div>
             <h1>AI <span className="go">goes.</span><br />You <span className="give">give.</span><br />Both earn.</h1>
             <p className="hero-p">You have the connections. AI has the sales skills. Together, you close deals on WhatsApp — and everyone gets paid.</p>
             <div className="join-box" id="join">
@@ -89,7 +101,7 @@ export default function Home() {
         </div>
 
         <div className="hero-stats rv">
-          <div className="stat-item"><div className="stat-val blue">2,400+</div><div className="stat-label">Active referrers</div></div>
+          <div className="stat-item"><div className="stat-val purple">2,400+</div><div className="stat-label">Active referrers</div></div>
           <div className="stat-item"><div className="stat-val green">RM 890K</div><div className="stat-label">Earned by community</div></div>
           <div className="stat-item"><div className="stat-val">94%</div><div className="stat-label">AI conversation success</div></div>
           <div className="stat-item"><div className="stat-val">12 sec</div><div className="stat-label">Average time to refer</div></div>
@@ -259,6 +271,7 @@ export default function Home() {
       {/* FOOTER */}
       <footer>
         <div className="foot-l">
+          <svg width="20" height="20" viewBox="0 0 40 40"><defs><linearGradient id="orb2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#038004" /><stop offset="50%" stopColor="#32C53C" /><stop offset="100%" stopColor="#45C696" /></linearGradient></defs><circle cx="20" cy="20" r="18" fill="url(#orb2)" /><path d="M22 8L12 22h7l-2 10 10-14h-7l2-10z" fill="#1A1A1A" opacity="0.85"/></svg>
           <span style={{ fontWeight: 800, fontSize: '16px' }}><span style={{ color: 'var(--go)' }}>Go</span><span style={{ color: 'var(--give)' }}>Give</span></span>
           &nbsp;© 2026
         </div>
