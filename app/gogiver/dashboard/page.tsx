@@ -29,7 +29,7 @@ const CATEGORY_STYLE: Record<string, { bg: string; text: string }> = {
 };
 
 type Tab = 'home' | 'refer' | 'products' | 'wallet' | 'admin';
-type AdminView = 'stats' | 'givers' | 'feed' | 'rates' | 'withdrawals' | 'giver_detail';
+type AdminView = 'stats' | 'givers' | 'feed' | 'withdrawals' | 'giver_detail' | 'products_mgmt' | 'product_edit';
 
 // ═══ MAIN COMPONENT ═══
 export default function GoGiverDashboard() {
@@ -60,11 +60,18 @@ export default function GoGiverDashboard() {
   const [adminStats, setAdminStats] = useState<any>(null);
   const [adminGivers, setAdminGivers] = useState<any>(null);
   const [adminFeed, setAdminFeed] = useState<any[]>([]);
-  const [adminRates, setAdminRates] = useState<any[]>([]);
   const [adminWithdrawals, setAdminWithdrawals] = useState<any[]>([]);
   const [giverDetail, setGiverDetail] = useState<any>(null);
   const [giverSearch, setGiverSearch] = useState('');
   const [adminLoading, setAdminLoading] = useState(false);
+
+  // Product management state
+  const [adminProducts, setAdminProducts] = useState<any[]>([]);
+  const [adminBots, setAdminBots] = useState<any[]>([]);
+  const [editingProduct, setEditingProduct] = useState<any>(null); // null=list, {}=new, {id:..}=edit
+  const [productForm, setProductForm] = useState({ name: '', description: '', category: '', commission_points: 10, gg_buyer_reward: 0, gg_giver_reward: 0, gg_upline_pct: 0.20, status: 'active', bot_id: '' });
+  const [productSaving, setProductSaving] = useState(false);
+  const [productMsg, setProductMsg] = useState<any>(null);
 
   const fetchDashboard = async () => {
     try {
@@ -148,11 +155,6 @@ export default function GoGiverDashboard() {
     try { const r = await fetch(`${API}/admin/feed`); if (r.ok) { const d = await r.json(); setAdminFeed(d.feed || []); } } catch {} finally { setAdminLoading(false); }
   }, []);
 
-  const fetchAdminRates = useCallback(async () => {
-    setAdminLoading(true);
-    try { const r = await fetch(`${API}/admin/rates`); if (r.ok) { const d = await r.json(); setAdminRates(d.products || []); } } catch {} finally { setAdminLoading(false); }
-  }, []);
-
   const fetchAdminWithdrawals = useCallback(async () => {
     setAdminLoading(true);
     try { const r = await fetch(`${API}/admin/withdrawals`); if (r.ok) { const d = await r.json(); setAdminWithdrawals(d.withdrawals || []); } } catch {} finally { setAdminLoading(false); }
@@ -170,18 +172,85 @@ export default function GoGiverDashboard() {
     } catch {}
   };
 
-  const updateRate = async (productId: number, field: string, value: number) => {
-    try {
-      await fetch(`${API}/admin/rates/${productId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [field]: value }) });
-      fetchAdminRates();
-    } catch {}
-  };
-
   const approveWithdrawal = async (txId: number) => {
     try { await fetch(`${API}/admin/withdrawals/${txId}/approve`, { method: 'POST' }); fetchAdminWithdrawals(); } catch {}
   };
   const rejectWithdrawal = async (txId: number) => {
     try { await fetch(`${API}/admin/withdrawals/${txId}/reject`, { method: 'POST' }); fetchAdminWithdrawals(); } catch {}
+  };
+
+  // ─── Product management fetchers ───
+  const fetchAdminProducts = useCallback(async () => {
+    setAdminLoading(true);
+    try { const r = await fetch(`${API}/admin/products`); if (r.ok) { const d = await r.json(); setAdminProducts(d.products || []); } } catch {} finally { setAdminLoading(false); }
+  }, []);
+
+  const fetchAdminBots = useCallback(async () => {
+    try { const r = await fetch(`${API}/admin/bots`); if (r.ok) { const d = await r.json(); setAdminBots(d.bots || []); } } catch {}
+  }, []);
+
+  const openProductForm = (product?: any) => {
+    if (product) {
+      setProductForm({
+        name: product.name || '', description: product.description || '', category: product.category || '',
+        commission_points: product.commission_points || 10, gg_buyer_reward: product.gg_buyer_reward || 0,
+        gg_giver_reward: product.gg_giver_reward || 0, gg_upline_pct: product.gg_upline_pct || 0.20,
+        status: product.status || 'active', bot_id: '',
+      });
+      setEditingProduct(product);
+      setAdminView('product_edit');
+    } else {
+      setProductForm({ name: '', description: '', category: '', commission_points: 10, gg_buyer_reward: 0, gg_giver_reward: 0, gg_upline_pct: 0.20, status: 'active', bot_id: '' });
+      setEditingProduct({});
+      setAdminView('product_edit');
+    }
+    setProductMsg(null);
+    fetchAdminBots();
+  };
+
+  const saveProduct = async () => {
+    if (!productForm.name.trim()) { setProductMsg({ error: 'Name required' }); return; }
+    setProductSaving(true); setProductMsg(null);
+    try {
+      const isNew = !editingProduct?.id;
+      const url = isNew ? `${API}/admin/products` : `${API}/admin/products/${editingProduct.id}`;
+      const method = isNew ? 'POST' : 'PUT';
+      const body: any = { ...productForm, gg_upline_pct: parseFloat(String(productForm.gg_upline_pct)) };
+      if (isNew && body.bot_id) body.bot_id = parseInt(body.bot_id);
+      else delete body.bot_id;
+
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const d = await r.json();
+      if (r.ok) {
+        setProductMsg({ success: isNew ? 'Product created!' : 'Product updated!' });
+        fetchAdminProducts();
+        fetchProducts(); // refresh gogiver products tab too
+        setTimeout(() => { setAdminView('products_mgmt'); setEditingProduct(null); }, 800);
+      } else {
+        setProductMsg({ error: d.error || 'Failed' });
+      }
+    } catch { setProductMsg({ error: 'Connection failed' }); }
+    finally { setProductSaving(false); }
+  };
+
+  const deleteProduct = async (productId: number) => {
+    if (!confirm('Deactivate this product?')) return;
+    try {
+      const r = await fetch(`${API}/admin/products/${productId}`, { method: 'DELETE' });
+      if (r.ok) fetchAdminProducts();
+    } catch {}
+  };
+
+  const mapBot = async (productId: number, botId: number) => {
+    try {
+      await fetch(`${API}/admin/products/${productId}/bots`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bot_id: botId, submission_type: 'lead' }) });
+      await fetch(`${API}/admin/products/${productId}/bots`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bot_id: botId, submission_type: 'confirmed' }) });
+      fetchAdminProducts();
+    } catch {}
+  };
+
+  const unmapBot = async (productId: number, botId: number) => {
+    try { await fetch(`${API}/admin/products/${productId}/bots/${botId}`, { method: 'DELETE' }); fetchAdminProducts(); } catch {}
   };
 
   if (loading && !data) return (
@@ -434,7 +503,8 @@ export default function GoGiverDashboard() {
                 ['stats', '📊', 'Stats'],
                 ['givers', '👥', 'GoGivers'],
                 ['feed', '📡', 'Live Feed'],
-                ...(isSuperuser ? [['rates', '💲', 'Rates'], ['withdrawals', '🏦', 'Withdrawals']] : []),
+                ['products_mgmt', '📦', 'Products'],
+                ...(isSuperuser ? [['withdrawals', '🏦', 'Withdrawals']] : []),
               ] as [AdminView, string, string][]).map(([k, icon, label]) => (
                 <button key={k}
                   onClick={() => {
@@ -442,7 +512,7 @@ export default function GoGiverDashboard() {
                     if (k === 'stats') fetchAdminStats();
                     if (k === 'givers') fetchAdminGivers(giverSearch);
                     if (k === 'feed') fetchAdminFeed();
-                    if (k === 'rates') fetchAdminRates();
+                    if (k === 'products_mgmt') { fetchAdminProducts(); fetchAdminBots(); }
                     if (k === 'withdrawals') fetchAdminWithdrawals();
                   }}
                   className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
@@ -629,21 +699,172 @@ export default function GoGiverDashboard() {
               </div>
             )}
 
-            {/* ─── RATES (superuser) ─── */}
-            {adminView === 'rates' && isSuperuser && !adminLoading && (
+            {/* ─── PRODUCTS MANAGEMENT ─── */}
+            {adminView === 'products_mgmt' && !adminLoading && (
               <div className="space-y-4">
-                <h3 className="text-white font-semibold">Commission Rates</h3>
-                <div className="space-y-2">
-                  {adminRates.map((p: any) => (
-                    <div key={p.id} className="bg-white/[0.03] rounded-xl px-4 py-3 border border-white/[0.06]">
-                      <p className="text-white text-sm font-medium mb-2">{p.name} <span className="text-gray-600 text-[10px]">{p.category}</span></p>
-                      <div className="grid grid-cols-3 gap-2">
-                        <RateInput label="Buyer RM" value={p.gg_buyer_reward || 0} onSave={v => updateRate(p.id, 'gg_buyer_reward', v)} />
-                        <RateInput label="Giver RM" value={p.gg_giver_reward || 0} onSave={v => updateRate(p.id, 'gg_giver_reward', v)} />
-                        <RateInput label="Upline %" value={Math.round((p.gg_upline_pct || 0) * 100)} onSave={v => updateRate(p.id, 'gg_upline_pct', v / 100)} />
+                <div className="flex items-center justify-between">
+                  <h3 className="text-white font-semibold">Products & Rates</h3>
+                  <button onClick={() => openProductForm()}
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-medium transition-colors">
+                    + Add Product
+                  </button>
+                </div>
+                {adminProducts.length === 0 ? <EmptyState text="No products yet" /> : (
+                  <div className="space-y-3">
+                    {adminProducts.map((p: any) => (
+                      <div key={p.id} className={`bg-white/[0.03] rounded-2xl border transition-colors ${p.status === 'active' ? 'border-white/[0.06]' : 'border-red-500/10 opacity-60'}`}>
+                        <div className="px-4 py-3.5">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-white font-semibold text-sm">{p.name}</h4>
+                                {p.category && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">{p.category}</span>}
+                                {p.status !== 'active' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400">{p.status}</span>}
+                              </div>
+                              {p.description && <p className="text-gray-500 text-xs mt-0.5 truncate">{p.description}</p>}
+                            </div>
+                            <div className="flex gap-1.5 flex-shrink-0 ml-3">
+                              <button onClick={() => openProductForm(p)} className="px-2 py-1 bg-white/5 text-gray-400 rounded-lg text-[10px] hover:bg-white/10 hover:text-white transition-colors">Edit</button>
+                              {isSuperuser && p.status === 'active' && (
+                                <button onClick={() => deleteProduct(p.id)} className="px-2 py-1 bg-red-500/5 text-red-400/60 rounded-lg text-[10px] hover:bg-red-500/10 hover:text-red-400 transition-colors">×</button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Commission rates */}
+                          <div className="grid grid-cols-3 gap-2 mb-3">
+                            <div className="bg-emerald-500/5 rounded-lg px-2.5 py-1.5">
+                              <p className="text-[9px] text-gray-500">Giver</p>
+                              <p className="text-emerald-400 text-sm font-bold">RM{p.gg_giver_reward || 0}</p>
+                            </div>
+                            <div className="bg-blue-500/5 rounded-lg px-2.5 py-1.5">
+                              <p className="text-[9px] text-gray-500">Buyer</p>
+                              <p className="text-blue-400 text-sm font-bold">RM{p.gg_buyer_reward || 0}</p>
+                            </div>
+                            <div className="bg-amber-500/5 rounded-lg px-2.5 py-1.5">
+                              <p className="text-[9px] text-gray-500">Upline</p>
+                              <p className="text-amber-400 text-sm font-bold">{Math.round((p.gg_upline_pct || 0) * 100)}%</p>
+                            </div>
+                          </div>
+
+                          {/* Bot mappings */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {(p.bot_mappings || []).map((bm: any, i: number) => (
+                              <div key={i} className="flex items-center gap-1 bg-white/5 rounded-lg px-2 py-1">
+                                <span className="text-white text-[10px]">{bm.bot_name}</span>
+                                <span className={`text-[8px] px-1 py-0.5 rounded ${bm.submission_type === 'confirmed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>{bm.submission_type}</span>
+                                <button onClick={() => unmapBot(p.id, bm.bot_id)} className="text-gray-600 hover:text-red-400 text-[10px] ml-0.5 transition-colors">×</button>
+                              </div>
+                            ))}
+                            {adminBots.length > 0 && (
+                              <select onChange={e => { if (e.target.value) { mapBot(p.id, parseInt(e.target.value)); e.target.value = ''; } }}
+                                className="bg-white/5 border border-dashed border-white/10 rounded-lg px-2 py-1 text-[10px] text-gray-500 focus:outline-none cursor-pointer">
+                                <option value="">+ Bot</option>
+                                {adminBots.filter(b => !(p.bot_mappings || []).some((bm: any) => bm.bot_id === b.id))
+                                  .map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                              </select>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── PRODUCT EDIT / CREATE ─── */}
+            {adminView === 'product_edit' && editingProduct && !adminLoading && (
+              <div className="space-y-4">
+                <button onClick={() => { setAdminView('products_mgmt'); setEditingProduct(null); fetchAdminProducts(); }}
+                  className="text-gray-500 text-xs hover:text-white transition-colors">← Back to products</button>
+
+                <h3 className="text-white font-semibold">{editingProduct.id ? 'Edit Product' : 'New Product'}</h3>
+
+                <div className="bg-white/[0.03] rounded-2xl border border-white/[0.06] p-5 space-y-4">
+                  <div>
+                    <label className="text-gray-400 text-xs font-medium block mb-1.5">Product Name *</label>
+                    <input value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})}
+                      placeholder="e.g. Unifi Home 300Mbps"
+                      className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:ring-2 focus:ring-amber-500/50 focus:outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-xs font-medium block mb-1.5">Description</label>
+                    <input value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})}
+                      placeholder="Short description"
+                      className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:ring-2 focus:ring-amber-500/50 focus:outline-none text-sm" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-gray-400 text-xs font-medium block mb-1.5">Category</label>
+                      <input value={productForm.category} onChange={e => setProductForm({...productForm, category: e.target.value})}
+                        placeholder="e.g. broadband, mobile"
+                        className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:ring-2 focus:ring-amber-500/50 focus:outline-none text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-xs font-medium block mb-1.5">Status</label>
+                      <select value={productForm.status} onChange={e => setProductForm({...productForm, status: e.target.value})}
+                        className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-amber-500/50 focus:outline-none text-sm appearance-none">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/[0.06] pt-4">
+                    <p className="text-amber-400 text-xs font-medium mb-3">💰 GoGive Commission Rates</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-gray-400 text-[10px] block mb-1">Giver RM</label>
+                        <input type="number" step="any" value={productForm.gg_giver_reward} onChange={e => setProductForm({...productForm, gg_giver_reward: parseFloat(e.target.value) || 0})}
+                          className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-emerald-400 font-bold focus:ring-2 focus:ring-emerald-500/50 focus:outline-none text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-gray-400 text-[10px] block mb-1">Buyer RM</label>
+                        <input type="number" step="any" value={productForm.gg_buyer_reward} onChange={e => setProductForm({...productForm, gg_buyer_reward: parseFloat(e.target.value) || 0})}
+                          className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-blue-400 font-bold focus:ring-2 focus:ring-blue-500/50 focus:outline-none text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-gray-400 text-[10px] block mb-1">Upline %</label>
+                        <input type="number" step="0.01" value={Math.round((productForm.gg_upline_pct || 0) * 100)} onChange={e => setProductForm({...productForm, gg_upline_pct: (parseFloat(e.target.value) || 0) / 100})}
+                          className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-amber-400 font-bold focus:ring-2 focus:ring-amber-500/50 focus:outline-none text-sm" />
                       </div>
                     </div>
-                  ))}
+                    <div className="mt-2 bg-white/[0.02] rounded-xl px-3 py-2 border border-white/[0.04]">
+                      <p className="text-gray-500 text-[10px]">Per completion: Giver RM{productForm.gg_giver_reward} + Buyer RM{productForm.gg_buyer_reward} + Upline RM{(productForm.gg_giver_reward * productForm.gg_upline_pct).toFixed(0)} = <span className="text-white font-bold">RM{(productForm.gg_giver_reward + productForm.gg_buyer_reward + productForm.gg_giver_reward * productForm.gg_upline_pct).toFixed(0)} total</span></p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/[0.06] pt-4">
+                    <p className="text-gray-400 text-xs font-medium mb-3">Partner Commission</p>
+                    <div>
+                      <label className="text-gray-400 text-[10px] block mb-1">Points per completion</label>
+                      <input type="number" value={productForm.commission_points} onChange={e => setProductForm({...productForm, commission_points: parseInt(e.target.value) || 0})}
+                        className="w-24 px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-amber-500/50 focus:outline-none text-sm" />
+                    </div>
+                  </div>
+
+                  {!editingProduct.id && adminBots.length > 0 && (
+                    <div className="border-t border-white/[0.06] pt-4">
+                      <p className="text-gray-400 text-xs font-medium mb-3">Map to Bot (optional)</p>
+                      <select value={productForm.bot_id} onChange={e => setProductForm({...productForm, bot_id: e.target.value})}
+                        className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-amber-500/50 focus:outline-none text-sm appearance-none">
+                        <option value="">No bot mapping</option>
+                        {adminBots.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  {productMsg && (
+                    <div className={`rounded-xl px-4 py-3 text-sm ${productMsg.success ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                      {productMsg.success || productMsg.error}
+                    </div>
+                  )}
+
+                  <button onClick={saveProduct} disabled={productSaving || !productForm.name.trim()}
+                    className="w-full py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl font-semibold transition-all disabled:opacity-40 active:scale-[0.98]">
+                    {productSaving ? <Spinner /> : editingProduct.id ? 'Save Changes' : 'Create Product'}
+                  </button>
                 </div>
               </div>
             )}
@@ -720,25 +941,6 @@ function StatusBadge({ sub }: { sub: any }) {
     return <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${s.bg} ${s.text}`}>{sub.stage_label || cat}</span>;
   }
   return <span className={`text-[10px] ${conf.color}`}>{conf.emoji} {conf.label}</span>;
-}
-
-function RateInput({ label, value, onSave }: { label: string; value: number; onSave: (v: number) => void }) {
-  const [val, setVal] = useState(String(value));
-  const [editing, setEditing] = useState(false);
-  return (
-    <div>
-      <p className="text-gray-500 text-[9px] mb-0.5">{label}</p>
-      {editing ? (
-        <div className="flex gap-1">
-          <input value={val} onChange={e => setVal(e.target.value)} autoFocus
-            className="w-full px-2 py-1 bg-white/10 border border-amber-500/30 rounded text-white text-sm focus:outline-none" type="number" step="any" />
-          <button onClick={() => { onSave(parseFloat(val) || 0); setEditing(false); }} className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs">✓</button>
-        </div>
-      ) : (
-        <button onClick={() => setEditing(true)} className="w-full px-2 py-1 bg-white/5 rounded text-white text-sm text-left hover:bg-white/10 transition-colors">{value}</button>
-      )}
-    </div>
-  );
 }
 
 // ═══ REFERRAL CARD ═══
