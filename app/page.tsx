@@ -174,16 +174,13 @@ export default function Home() {
         </div>
         <div className="prod-grid rv">
           {[
-            { name: 'LG PuriCare', type: 'Water purifier', mult: '6×', earn: 'RM 60', bg: '#A50034', label: 'LG', sub: 'PuriCare' },
-            { name: 'Unifi Business', type: 'B2B fibre internet', mult: '4×', earn: 'RM 40', bg: '#E4002B', label: 'unifi', sub: 'Business' },
-            { name: 'Unifi Home', type: 'Home fibre internet', mult: '2×', earn: 'RM 20', bg: '#0033A0', label: 'unifi', sub: 'Home' },
-            { name: 'Unifi Mobile', type: 'Postpaid plan', mult: '1×', earn: 'RM 10', bg: '#6B21A8', label: 'unifi', sub: 'Mobile' },
+            { img: 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=500&h=300&fit=crop', name: 'LG PuriCare', type: 'Water purifier', mult: '6×', earn: 'RM 60' },
+            { img: 'https://images.unsplash.com/photo-1553877522-43269d4ea984?w=500&h=300&fit=crop', name: 'Unifi Business', type: 'B2B fibre internet', mult: '4×', earn: 'RM 40' },
+            { img: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=500&h=300&fit=crop', name: 'Unifi Home', type: 'Home fibre internet', mult: '2×', earn: 'RM 20' },
+            { img: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&h=300&fit=crop', name: 'Unifi Mobile', type: 'Postpaid plan', mult: '1×', earn: 'RM 10' },
           ].map(p => (
             <div className="prod-item" key={p.name}>
-              <div className="prod-brand" style={{ background: p.bg }}>
-                <span className="prod-brand-label">{p.label}</span>
-                <span className="prod-brand-sub">{p.sub}</span>
-              </div>
+              <ImgFallback className="prod-img" src={p.img} alt={p.type} fallback="blue" />
               <div className="prod-info">
                 <div className="prod-name">{p.name}</div>
                 <div className="prod-type">{p.type}</div>
